@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: energy-tracker-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    networks:
+      - energy-network
+
+  web:
+    image: nginx:alpine
+    container_name: energy-tracker-web
+    restart: unless-stopped
+    ports:
+      - "6006:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - energy-network
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: energy-tracker-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-energy_tracker}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456788}
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - energy-network
+
+networks:
+  energy-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local

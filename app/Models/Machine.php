@@ -43,4 +43,16 @@ class Machine extends Model
         return $this->hasOne(DailyEnergySummary::class)
             ->whereDate('date', today());
     }
+
+    public function recentReadings()
+    {
+        return $this->hasManyThrough(
+            PowerReading::class,
+            Device::class,
+            'machine_id',
+            'device_id',
+            'id',
+            'id'
+        )->orderBy('recorded_at', 'desc')->limit(10);
+    }
 }

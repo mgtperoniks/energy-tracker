@@ -33,11 +33,28 @@ Route::middleware('auth')->group(function () {
     Route::get('/machines/{id?}', function ($id = null) {
         $machine = null;
         if ($id) {
-            $machine = \App\Models\Machine::with('devices')->find($id);
+            $machine = \App\Models\Machine::with(['devices', 'latestReading', 'todaySummary', 'recentReadings'])->find($id);
         } else {
-            $machine = \App\Models\Machine::with('devices')->first();
+            $machine = \App\Models\Machine::with(['devices', 'latestReading', 'todaySummary', 'recentReadings'])->first();
         }
-        return view('machine', compact('machine'));
+
+        // Fetch Power History (Kw) for the past 24 hours for chart
+        $historyLabels = [];
+        $historyValues = [];
+        if ($machine) {
+            $history = \App\Models\PowerReading::whereIn('device_id', $machine->devices->pluck('id'))
+                        ->where('recorded_at', '>=', now()->subHours(24))
+                        ->orderBy('recorded_at', 'asc')
+                        ->get(['recorded_at', 'power_kw']);
+            
+            foreach ($history as $point) {
+                // Formatting for Javascript
+                $historyLabels[] = $point->recorded_at->format('H:i');
+                $historyValues[] = $point->power_kw;
+            }
+        }
+
+        return view('machine', compact('machine', 'historyLabels', 'historyValues'));
     })->name('machines');
 
     Route::get('/environmental', function () {
