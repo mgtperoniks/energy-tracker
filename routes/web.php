@@ -41,20 +41,39 @@ Route::middleware('auth')->group(function () {
         // Fetch Power History (Kw) for the past 24 hours for chart
         $historyLabels = [];
         $historyValues = [];
+        $todayConsumption = 0;
         if ($machine) {
-            $history = \App\Models\PowerReading::whereIn('device_id', $machine->devices->pluck('id'))
+            $deviceIds = $machine->devices->pluck('id');
+            $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
                         ->where('recorded_at', '>=', now()->subHours(24))
                         ->orderBy('recorded_at', 'asc')
-                        ->get(['recorded_at', 'power_kw']);
+                        ->get(['recorded_at', 'power_kw', 'kwh_total']);
             
             foreach ($history as $point) {
-                // Formatting for Javascript
                 $historyLabels[] = $point->recorded_at->format('H:i');
                 $historyValues[] = $point->power_kw;
             }
+
+            // Calculate today's consumption from kwh_total difference
+            $todayReadings = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
+                        ->whereDate('recorded_at', today())
+                        ->orderBy('recorded_at', 'asc')
+                        ->get(['kwh_total', 'power_kw', 'recorded_at']);
+
+            if ($todayReadings->count() >= 2) {
+                $kwhDiff = $todayReadings->last()->kwh_total - $todayReadings->first()->kwh_total;
+                if ($kwhDiff > 0) {
+                    $todayConsumption = round($kwhDiff, 2);
+                } else {
+                    // Estimate from average power × hours elapsed
+                    $avgKw = $todayReadings->avg('power_kw');
+                    $hoursElapsed = $todayReadings->first()->recorded_at->diffInMinutes($todayReadings->last()->recorded_at) / 60;
+                    $todayConsumption = round($avgKw * $hoursElapsed, 2);
+                }
+            }
         }
 
-        return view('machine', compact('machine', 'historyLabels', 'historyValues'));
+        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'todayConsumption'));
     })->name('machines');
 
     Route::get('/environmental', function () {

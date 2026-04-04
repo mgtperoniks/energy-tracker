@@ -34,12 +34,16 @@
                     <span class="material-symbols-outlined text-primary" data-icon="electric_bolt">electric_bolt</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-5xl font-black tracking-tight text-on-surface">{{ number_format($machine->todaySummary->kwh_usage ?? 0, 1) }}</span>
+                    <span class="text-5xl font-black tracking-tight text-on-surface">{{ number_format($todayConsumption, 1) }}</span>
                     <span class="text-xl font-bold text-outline">kWh</span>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-secondary text-sm font-bold">
                     <span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
-                    Real-time Summary
+                    @if($todayConsumption > 0)
+                        Estimated from avg power × time
+                    @else
+                        Waiting for data accumulation
+                    @endif
                 </div>
             </div>
 
