@@ -76,9 +76,13 @@ Route::middleware('auth')->group(function () {
         return view('machine', compact('machine', 'historyLabels', 'historyValues', 'todayConsumption'));
     })->name('machines');
 
+
     Route::get('/environmental', function () {
         return view('environmental');
     })->name('environmental');
 
+    Route::get('/api/machines/{id}/readings', [\App\Http\Controllers\Api\MachineController::class, 'readings'])->name('api.machines.readings');
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
+

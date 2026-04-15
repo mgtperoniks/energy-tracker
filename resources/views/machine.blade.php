@@ -218,7 +218,15 @@
                                 @endif
                             </td>
                             <td class="px-8 py-4 text-right">
-                                <button class="text-primary hover:underline text-xs font-bold">Details</button>
+                                <button class="text-primary hover:underline text-xs font-bold detail-btn" 
+                                    data-timestamp="{{ $row->recorded_at }}"
+                                    data-power="{{ number_format($row->power_kw, 2) }}"
+                                    data-voltage="{{ number_format($row->voltage, 1) }}"
+                                    data-current="{{ number_format($row->current, 1) }}"
+                                    data-pf="{{ number_format($row->power_factor ?? 1.0, 2) }}"
+                                    data-kwh="{{ number_format($row->kwh_total, 2) }}">
+                                    Details
+                                </button>
                             </td>
                         </tr>
                         @empty
@@ -231,9 +239,192 @@
             </div>
             
             <div class="p-4 bg-surface-container-low flex justify-center">
-                <button class="text-[10px] font-black text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors">Load Full History</button>
+                <button id="load-more-btn" data-machine-id="{{ $machine->id }}" data-offset="10" class="text-[10px] font-black text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors">Load Full History</button>
             </div>
         </div>
     </div>
 </main>
+
+<!-- Details Modal -->
+<div id="details-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all animate-in fade-in duration-300 pointer-events-none">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transform transition-all scale-95 opacity-0 duration-300 pointer-events-auto" id="modal-content">
+        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">Reading Details</h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+        <div class="p-6 space-y-6">
+            <div class="flex justify-between items-end border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Timestamp</span>
+                    <div id="modal-timestamp" class="text-sm font-mono font-bold text-slate-700 dark:text-slate-300"></div>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Status</span>
+                    <div id="modal-status" class="mt-1"></div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Active Power</span>
+                    <div class="flex items-baseline gap-1">
+                        <span id="modal-power" class="text-2xl font-black text-primary tracking-tight"></span>
+                        <span class="text-xs font-bold text-slate-400">kW</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Total Energy</span>
+                    <div class="flex items-baseline gap-1">
+                        <span id="modal-kwh" class="text-2xl font-black text-on-surface tracking-tight"></span>
+                        <span class="text-xs font-bold text-slate-400">kWh</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Voltage</span>
+                    <div class="flex items-baseline gap-1 text-slate-700">
+                        <span id="modal-voltage" class="text-xl font-bold tracking-tight"></span>
+                        <span class="text-xs font-bold text-slate-400">V</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Current</span>
+                    <div class="flex items-baseline gap-1 text-slate-700">
+                        <span id="modal-current" class="text-xl font-bold tracking-tight"></span>
+                        <span class="text-xs font-bold text-slate-400">A</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Power Factor</span>
+                    <div id="modal-pf" class="text-xl font-bold text-slate-700"></div>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
+            <button onclick="closeModal()" class="w-full py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openModal(data) {
+        document.getElementById('modal-timestamp').innerText = data.timestamp;
+        document.getElementById('modal-power').innerText = data.power;
+        document.getElementById('modal-voltage').innerText = data.voltage;
+        document.getElementById('modal-current').innerText = data.current;
+        document.getElementById('modal-pf').innerText = data.pf;
+        document.getElementById('modal-kwh').innerText = data.kwh;
+        
+        const statusEl = document.getElementById('modal-status');
+        if (parseFloat(data.power) > 40) {
+            statusEl.innerHTML = '<span class="bg-rose-100 text-rose-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Spike</span>';
+        } else {
+            statusEl.innerHTML = '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Optimal</span>';
+        }
+
+        const modal = document.getElementById('details-modal');
+        const content = document.getElementById('modal-content');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            modal.classList.remove('pointer-events-none');
+            content.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('details-modal');
+        const content = document.getElementById('modal-content');
+        content.classList.add('scale-95', 'opacity-0');
+        modal.classList.add('pointer-events-none');
+        setTimeout(() => {
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Event delegation for Details buttons
+        document.body.addEventListener('click', function(e) {
+            if (e.target.classList.contains('detail-btn')) {
+                const data = e.target.dataset;
+                openModal(data);
+            }
+        });
+
+        // Load More function
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', async function() {
+                const machineId = this.dataset.machineId;
+                const offset = parseInt(this.dataset.offset);
+                const originalText = this.innerText;
+                this.innerText = 'LOADING...';
+                this.classList.add('opacity-50', 'cursor-not-allowed');
+                this.disabled = true;
+
+                try {
+                    const response = await fetch(`/api/machines/${machineId}/readings?offset=${offset}&limit=10`);
+                    const result = await response.json();
+
+                    if (result.status === 'success' && result.data.length > 0) {
+                        const tbody = document.querySelector('tbody');
+                        result.data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
+                            
+                            const power = parseFloat(row.power_kw);
+                            const statusHtml = power > 40 
+                                ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
+                                : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>';
+
+                            tr.innerHTML = `
+                                <td class="px-8 py-4 font-mono text-xs">${row.recorded_at}</td>
+                                <td class="px-4 py-4 text-right font-bold text-primary">${power.toFixed(2)}</td>
+                                <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
+                                <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
+                                <td class="px-4 py-4 text-center">${statusHtml}</td>
+                                <td class="px-8 py-4 text-right">
+                                    <button class="text-primary hover:underline text-xs font-bold detail-btn" 
+                                        data-timestamp="${row.recorded_at}"
+                                        data-power="${power.toFixed(2)}"
+                                        data-voltage="${parseFloat(row.voltage).toFixed(1)}"
+                                        data-current="${parseFloat(row.current).toFixed(1)}"
+                                        data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
+                                        data-kwh="${parseFloat(row.kwh_total).toFixed(2)}">
+                                        Details
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+
+                        this.dataset.offset = offset + result.data.length;
+                        this.innerText = originalText;
+                        this.classList.remove('opacity-50', 'cursor-not-allowed');
+                        this.disabled = false;
+                        
+                        if (result.data.length < 10) {
+                            this.remove(); // No more data
+                        }
+                    } else {
+                        this.remove();
+                    }
+                } catch (error) {
+                    console.error('Error loading more readings:', error);
+                    this.innerText = originalText;
+                    this.classList.remove('opacity-50', 'cursor-not-allowed');
+                    this.disabled = false;
+                }
+            });
+        }
+    });
+
+    // Close modal on background click
+    document.getElementById('details-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+</script>
 @endsection
+

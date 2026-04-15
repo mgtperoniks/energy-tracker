@@ -1,86 +1,89 @@
-import minimalmodbus
-import serial
+from pymodbus.client import ModbusTcpClient
 import requests
 import time
-import json
 from datetime import datetime
+import struct
 
 # --- CONFIGURATION ---
-SERIAL_PORT = 'COM3'  # USB-SERIAL CH340
-BAUD_RATE = 9600      # Matched to Power Meter setting
-PARITY = serial.PARITY_NONE  # Matched to Power Meter setting
-PHYSICAL_SLAVE_ID = 1  # The actual Slave ID on the physical Power Meter
-REPORT_AS_SLAVE_ID = 3  # Report to Laravel as Slave ID 3 (Machine: COR PASIR, PM-03)
+MODBUS_IP = '10.88.8.16'
+MODBUS_PORT = 502
+PHYSICAL_SLAVE_ID = 1
+REPORT_AS_SLAVE_ID = 3
 LARAVEL_API_URL = 'http://localhost/energy-tracker/public/index.php/api/readings'
-INTERVAL_SECONDS = 60  # Poll every 1 minute (30 min = 30 data points)
+INTERVAL_SECONDS = 60
 
-# --- REGISTER MAP (Float32, FC=03) ---
-# Discovered via register scan on actual Power Meter
-REG_TOTAL_KWH = 74    # Total Active Energy (kWh)
-REG_AVG_VOLT  = 3009  # Average Voltage L-N (V)
-REG_AVG_AMP   = 3017  # Average Current (A) - max of phases
-REG_TOTAL_KW  = 3045  # Total Active Power (kW)
-REG_PF        = 3083  # Power Factor
+# --- REGISTER MAP ---
+REG_TOTAL_KWH = 74
+REG_AVG_VOLT  = 3009
+REG_AVG_AMP   = 3017
+REG_TOTAL_KW  = 3045
+REG_PF        = 3083
 
-def poll_meter(physical_slave_id):
-    try:
-        instrument = minimalmodbus.Instrument(SERIAL_PORT, physical_slave_id)
-        instrument.serial.baudrate = BAUD_RATE
-        instrument.serial.parity = PARITY
-        instrument.serial.timeout = 1.5
-        instrument.mode = minimalmodbus.MODE_RTU
-        
-        # Read Float32 (2 registers each)
-        kwh = instrument.read_float(REG_TOTAL_KWH, functioncode=3, number_of_registers=2)
-        kw = instrument.read_float(REG_TOTAL_KW, functioncode=3, number_of_registers=2)
-        amps = instrument.read_float(REG_AVG_AMP, functioncode=3, number_of_registers=2)
-        volts = instrument.read_float(REG_AVG_VOLT, functioncode=3, number_of_registers=2)
-        pf = instrument.read_float(REG_PF, functioncode=3, number_of_registers=2)
-        
-        instrument.serial.close()
-        
-        return {
-            'slave_id': REPORT_AS_SLAVE_ID,  # Report as Machine 3 for demo
-            'kwh_total': round(kwh, 2),
-            'power_kw': round(kw, 3),
-            'voltage': round(volts, 1),
-            'current': round(amps, 2),
-            'power_factor': round(pf, 3)
-        }
-    except Exception as e:
-        print(f"[{datetime.now()}] Error polling Slave ID {physical_slave_id}: {str(e)}")
-        try:
-            instrument.serial.close()
-        except:
-            pass
+def read_float(client, address, slave):
+    rr = client.read_holding_registers(address, 2, slave=slave)
+    if rr.isError():
+        return None
+    
+    raw = rr.registers
+    # Convert 2 register → float32
+    value = struct.unpack('>f', struct.pack('>HH', raw[0], raw[1]))[0]
+    return value
+
+def poll_meter():
+    client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT)
+
+    if not client.connect():
+        print("Gagal connect ke device")
         return None
 
+    try:
+        kwh = read_float(client, REG_TOTAL_KWH, PHYSICAL_SLAVE_ID)
+        kw = read_float(client, REG_TOTAL_KW, PHYSICAL_SLAVE_ID)
+        amps = read_float(client, REG_AVG_AMP, PHYSICAL_SLAVE_ID)
+        volts = read_float(client, REG_AVG_VOLT, PHYSICAL_SLAVE_ID)
+        pf = read_float(client, REG_PF, PHYSICAL_SLAVE_ID)
+
+        return {
+            'slave_id': REPORT_AS_SLAVE_ID,
+            'kwh_total': round(kwh, 2) if kwh else 0,
+            'power_kw': round(kw, 3) if kw else 0,
+            'voltage': round(volts, 1) if volts else 0,
+            'current': round(amps, 2) if amps else 0,
+            'power_factor': round(pf, 3) if pf else 0
+        }
+
+    except Exception as e:
+        print(f"[{datetime.now()}] Error: {str(e)}")
+        return None
+
+    finally:
+        client.close()
+
 def main():
-    print(f"--- Energy Tracker Modbus Poller (DEMO MODE) ---")
-    print(f"Target: {SERIAL_PORT} @ {BAUD_RATE}bps")
-    print(f"Physical Slave: {PHYSICAL_SLAVE_ID} → Report as Slave: {REPORT_AS_SLAVE_ID}")
+    print(f"--- Energy Tracker Modbus TCP Poller ---")
+    print(f"Target: {MODBUS_IP}:{MODBUS_PORT}")
     print(f"Polling every {INTERVAL_SECONDS}s\n")
 
     poll_count = 0
+
     while True:
         start_time = time.time()
         poll_count += 1
-        
-        data = poll_meter(PHYSICAL_SLAVE_ID)
+
+        data = poll_meter()
+
         if data:
             try:
                 response = requests.post(LARAVEL_API_URL, json=data, timeout=5)
                 if response.status_code == 200:
-                    print(f"[{datetime.now()}] #{poll_count} PM-03: {data['kwh_total']} kWh, {data['power_kw']} kW, {data['voltage']}V, {data['current']}A, PF={data['power_factor']} -> Success")
+                    print(f"[{datetime.now()}] #{poll_count} OK → {data}")
                 else:
-                    print(f"[{datetime.now()}] #{poll_count} PM-03: API Error {response.status_code} - {response.text}")
-            except requests.exceptions.RequestException as e:
-                print(f"[{datetime.now()}] #{poll_count} API Connection Failed: {str(e)}")
-        
-        # Wait for the next interval
+                    print(f"[{datetime.now()}] API Error {response.status_code}")
+            except Exception as e:
+                print(f"[{datetime.now()}] API Failed: {str(e)}")
+
         elapsed = time.time() - start_time
-        wait_time = max(0, INTERVAL_SECONDS - elapsed)
-        time.sleep(wait_time)
+        time.sleep(max(0, INTERVAL_SECONDS - elapsed))
 
 if __name__ == "__main__":
     main()
