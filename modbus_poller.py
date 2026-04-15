@@ -20,7 +20,7 @@ REG_TOTAL_KW  = 3045
 REG_PF        = 3083
 
 def read_float(client, address, slave):
-    rr = client.read_holding_registers(address, 2, slave=slave)
+    rr = client.read_holding_registers(address, 2, unit=slave)
     if rr.isError():
         return None
     
