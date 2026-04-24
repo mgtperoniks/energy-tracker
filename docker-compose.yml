@@ -37,6 +37,18 @@ services:
     networks:
       - energy-network
 
+  poller:
+    build:
+      context: .
+      dockerfile: Dockerfile.poller
+    container_name: energy-tracker-poller
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - web
+    networks:
+      - energy-network
+
 networks:
   energy-network:
     driver: bridge
