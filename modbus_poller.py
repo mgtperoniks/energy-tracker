@@ -46,14 +46,14 @@ def poll_meter():
     client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5)
 
     if not client.connect():
-        print(f"[{datetime.now()}] STATUS: OFFLINE (Cannot connect to {MODBUS_IP})")
+        print(f"[{datetime.now()}] STATUS: OFFLINE (Cannot connect to {MODBUS_IP})", flush=True)
         return None
 
     try:
         kwh   = read_float(client, REG_TOTAL_KWH, PHYSICAL_SLAVE_ID)
         
         if kwh is None:
-            print(f"[{datetime.now()}] STATUS: NO RESPONSE (Connected but failed to read registers)")
+            print(f"[{datetime.now()}] STATUS: NO RESPONSE (Connected but failed to read registers)", flush=True)
             return None
 
         kw    = read_float(client, REG_TOTAL_KW, PHYSICAL_SLAVE_ID)
@@ -81,10 +81,10 @@ def poll_meter():
 
 # --- MAIN LOOP ---
 def main():
-    print("=== Energy Tracker Modbus TCP Poller ===")
-    print(f"Target: {MODBUS_IP}:{MODBUS_PORT} (Slave {PHYSICAL_SLAVE_ID})")
-    print(f"API Target: {LARAVEL_API_URL}")
-    print(f"Polling every {INTERVAL_SECONDS} seconds\n")
+    print("=== Energy Tracker Modbus TCP Poller ===", flush=True)
+    print(f"Target: {MODBUS_IP}:{MODBUS_PORT} (Slave {PHYSICAL_SLAVE_ID})", flush=True)
+    print(f"API Target: {LARAVEL_API_URL}", flush=True)
+    print(f"Polling every {INTERVAL_SECONDS} seconds\n", flush=True)
 
     poll_count = 0
 
@@ -103,9 +103,9 @@ def main():
                 )
 
                 if response.status_code == 200:
-                    print(f"[{datetime.now()}] #{poll_count} SUCCESS → {data['kwh_total']} kWh")
+                    print(f"[{datetime.now()}] #{poll_count} SUCCESS → {data['kwh_total']} kWh", flush=True)
                 else:
-                    print(f"[{datetime.now()}] API ERROR {response.status_code} → {response.text}")
+                    print(f"[{datetime.now()}] API ERROR {response.status_code} → {response.text}", flush=True)
 
             except Exception as e:
                 print(f"[{datetime.now()}] API FAILED: {e}")
