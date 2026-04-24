@@ -93,26 +93,33 @@ def main():
         poll_count += 1
 
         data = poll_meter()
+        # If no data (Offline), we send a 0 kW reading to the API to show "Mati"
+        payload = data if data else {
+            'slave_id': REPORT_AS_SLAVE_ID,
+            'kwh_total': None, # API will use last known value
+            'power_kw': 0,
+            'voltage': 0,
+            'current': 0,
+            'power_factor': 0,
+            'is_offline': True
+        }
 
-        if data:
-            try:
-                response = requests.post(
-                    LARAVEL_API_URL,
-                    json=data,
-                    timeout=10
-                )
+        try:
+            response = requests.post(
+                LARAVEL_API_URL,
+                json=payload,
+                timeout=10
+            )
 
-                if response.status_code == 200:
-                    print(f"[{datetime.now()}] #{poll_count} SUCCESS → {data['kwh_total']} kWh", flush=True)
-                else:
-                    print(f"[{datetime.now()}] API ERROR {response.status_code} → {response.text}", flush=True)
+            if response.status_code == 200:
+                status_msg = f"SUCCESS → {payload.get('kwh_total')} kWh" if data else "REPORTED OFFLINE"
+                print(f"[{datetime.now()}] #{poll_count} {status_msg}", flush=True)
+            else:
+                print(f"[{datetime.now()}] API ERROR {response.status_code} → {response.text}", flush=True)
 
-            except Exception as e:
-                print(f"[{datetime.now()}] API FAILED: {e}")
-        else:
-            # When offline, we don't send data to API to avoid recording zeros/errors
-            # unless specific 'offline' status tracking is implemented in the API.
-            pass
+        except Exception as e:
+            print(f"[{datetime.now()}] API FAILED: {e}", flush=True)
+
 
         elapsed = time.time() - start_time
         sleep_time = max(1, INTERVAL_SECONDS - elapsed)

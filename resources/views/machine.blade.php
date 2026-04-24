@@ -213,6 +213,8 @@
                             <td class="px-4 py-4 text-center">
                                 @if($row->power_kw > 40)
                                     <span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>
+                                @elseif($row->power_kw <= 0)
+                                    <span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>
                                 @else
                                     <span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>
                                 @endif
@@ -319,6 +321,8 @@
         const statusEl = document.getElementById('modal-status');
         if (parseFloat(data.power) > 40) {
             statusEl.innerHTML = '<span class="bg-rose-100 text-rose-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Spike</span>';
+        } else if (parseFloat(data.power) <= 0) {
+            statusEl.innerHTML = '<span class="bg-slate-100 text-slate-500 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Mati</span>';
         } else {
             statusEl.innerHTML = '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Optimal</span>';
         }
@@ -377,7 +381,9 @@
                             const power = parseFloat(row.power_kw);
                             const statusHtml = power > 40 
                                 ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
-                                : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>';
+                                : (power <= 0 
+                                    ? '<span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>'
+                                    : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>');
 
                             tr.innerHTML = `
                                 <td class="px-8 py-4 font-mono text-xs">${row.recorded_at}</td>
