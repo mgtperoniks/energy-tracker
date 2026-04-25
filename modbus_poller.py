@@ -31,6 +31,7 @@ def read_float(client, address, slave):
         )
 
         if rr.isError():
+            print(f"[{datetime.now()}] MODBUS ERROR at Reg {address}: {rr}", flush=True)
             return None
 
         raw = rr.registers
@@ -38,8 +39,10 @@ def read_float(client, address, slave):
         value = struct.unpack('>f', struct.pack('>HH', raw[0], raw[1]))[0]
         return value
 
-    except Exception:
+    except Exception as e:
+        print(f"[{datetime.now()}] EXCEPTION at Reg {address}: {e}", flush=True)
         return None
+
 
 # --- POLL DEVICE ---
 def poll_meter():
