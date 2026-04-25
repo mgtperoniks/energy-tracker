@@ -45,3 +45,34 @@ Jangan lakukan hal-hal berikut untuk mencegah kegagalan sistem atau pembacaan da
 1. Modifikasi `modbus_poller.py` agar menerima array of Slave IDs.
 2. Implementasi mekanisme *retry* (maksimal 3x) sebelum menandai node sebagai "Offline".
 3. Integrasi ke Dashboard Laravel untuk monitoring real-time 22 node.
+
+---
+
+## ✅ Konfigurasi USR TCP Gateway (KRITIS)
+
+Dokumen ini mencatat temuan penting saat commissioning USR TCP Gateway ke PM2200.
+
+### Setting Serial Port (`http://10.88.8.16` → Serial Port)
+| Parameter | Value | Catatan |
+| :--- | :--- | :--- |
+| **Baud Rate** | `9600` | Harus sama dengan setting di PM2200 |
+| **Data Size** | `8` | Default |
+| **Parity** | `None` | Harus sama dengan setting di PM2200 |
+| **Stop Bits** | `1` | Default |
+| **Local Port** | `502` | Standar Modbus TCP |
+| **Work Mode** | `TCP Server` | Gateway menunggu koneksi dari Python |
+| **Similar RFC2217** | `OFF` ❌ | Harus **dimatikan**, atau Modbus tidak akan berfungsi |
+
+### ⚠️ PENYEBAB UTAMA `NO RESPONSE` — Wajib Diingat!
+> **Expand Function → Modbus Type HARUS diset ke `Modbus TCP/RTU`**
+>
+> Jika dibiarkan `None`, USR gateway tidak melakukan konversi protokol antara
+> Modbus TCP (dari Python) ke Modbus RTU (ke Power Meter via RS485).
+> Koneksi TCP berhasil, tapi data tidak pernah sampai ke meter.
+
+### Checklist Commissioning USR Gateway Baru
+- [ ] Serial Port: Baudrate & Parity cocok dengan PM2200
+- [ ] Similar RFC2217: **OFF**
+- [ ] Expand Function → Modbus Type: **`Modbus TCP/RTU`**
+- [ ] Save → Reboot USR
+

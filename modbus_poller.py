@@ -14,6 +14,7 @@ REPORT_AS_SLAVE_ID = int(os.getenv('REPORT_AS_SLAVE_ID', 3))
 LARAVEL_API_URL = os.getenv('MODBUS_API_URL', 'http://web/api/readings')
 INTERVAL_SECONDS = int(os.getenv('POLLING_INTERVAL', 600))  # Default 10 minutes
 
+
 # --- REGISTER MAP (PM2200) ---
 REG_TOTAL_KWH = 74
 REG_AVG_VOLT  = 3009
