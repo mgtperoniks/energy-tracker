@@ -60,55 +60,79 @@
         @if($isGenerated)
         <!-- Report Content -->
         <div class="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm border border-outline-variant/30 print:shadow-none print:border-none">
-            <!-- Print-only Header -->
-            <div class="hidden print:block p-8 border-b border-slate-200">
-                <h2 class="text-2xl font-bold">PERoni Karya Sentra Industrial Energy System - Energy Usage Report</h2>
-                <p class="text-sm text-slate-500">Range: {{ $startDate }} to {{ $endDate }}</p>
-                @if($machineId)
-                    @php $selectedMachine = $machines->find($machineId); @endphp
-                    <p class="text-sm font-bold">Target: {{ $selectedMachine->name }} ({{ $selectedMachine->code }})</p>
-                @else
-                    <p class="text-sm font-bold">Target: All Power Meters</p>
-                @endif
+            <!-- Professional Print-only Header -->
+            <div class="hidden print:block p-8 border-b-2 border-primary mb-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h1 class="text-2xl font-black text-primary tracking-tighter uppercase">Energy Usage Report</h1>
+                        <p class="text-xs font-bold text-on-surface-variant mt-1">PERoni Karya Sentra Industrial System</p>
+                    </div>
+                    <div class="text-right text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+                        <p>Generated: {{ now()->format('d M Y H:i') }}</p>
+                        <p>Status: Official Record</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-8 mt-8 py-6 border-t border-b border-outline-variant/10">
+                    <div>
+                        <span class="text-[9px] font-black uppercase tracking-widest text-outline">Report Period</span>
+                        <p class="text-sm font-bold mt-1 text-on-surface">{{ $startDate }} → {{ $endDate }}</p>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-black uppercase tracking-widest text-outline">Target Asset</span>
+                        <p class="text-sm font-bold mt-1 text-on-surface">
+                            @if($machineId)
+                                @php $selectedMachine = $machines->find($machineId); @endphp
+                                {{ $selectedMachine->name }} ({{ $selectedMachine->code }})
+                            @else
+                                All Power Meters
+                            @endif
+                        </p>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-black uppercase tracking-widest text-outline">Total Consumption</span>
+                        <p class="text-sm font-black mt-1 text-primary">{{ number_format($reports->sum('kwh_usage'), 2) }} kWh</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto print:overflow-visible">
                 <table id="report-table" class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-surface-container-low/50 text-on-surface-variant uppercase text-[10px] font-bold tracking-widest">
+                        <tr class="bg-surface-container-low/50 print:bg-slate-100 text-on-surface-variant uppercase text-[9px] font-black tracking-widest border-b border-outline-variant/30">
                             <th class="px-6 py-4">Date</th>
                             <th class="px-6 py-4">Power Meter</th>
-                            <th class="px-6 py-4">Department</th>
-                            <th class="px-6 py-4 text-right">Daily Consumption</th>
+                            <th class="px-6 py-4">Area / Department</th>
+                            <th class="px-6 py-4 text-right">Consumption</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
                         @forelse($reports as $row)
-                        <tr class="hover:bg-surface-container-low/30 transition-colors">
-                            <td class="px-6 py-4 text-sm font-medium font-mono text-on-surface">{{ $row->date }}</td>
-                            <td class="px-6 py-4">
-                                <div class="text-sm font-bold text-primary">{{ $row->machine->code }}</div>
+                        <tr class="hover:bg-surface-container-low/30 transition-colors print:break-inside-avoid">
+                            <td class="px-6 py-3 text-xs font-bold font-mono text-on-surface">{{ $row->date }}</td>
+                            <td class="px-6 py-3">
+                                <div class="text-xs font-black text-primary">{{ $row->machine->code }}</div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-on-surface-variant">{{ $row->machine->name }}</td>
-                            <td class="px-6 py-4 text-right">
-                                <span class="font-mono text-sm font-bold">{{ number_format($row->kwh_usage, 2) }}</span>
-                                <span class="text-[10px] text-outline ml-1">kWh</span>
+                            <td class="px-6 py-3 text-xs text-on-surface-variant font-medium">{{ $row->machine->name }}</td>
+                            <td class="px-6 py-3 text-right">
+                                <span class="font-mono text-xs font-black text-on-surface">{{ number_format($row->kwh_usage, 2) }}</span>
+                                <span class="text-[9px] font-bold text-outline ml-0.5">kWh</span>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-12 text-center text-on-surface-variant italic">
-                                No data found for the selected criteria.
+                            <td colspan="4" class="px-6 py-12 text-center text-on-surface-variant italic text-xs">
+                                No records found for this period.
                             </td>
                         </tr>
                         @endforelse
                     </tbody>
                     @if($reports->isNotEmpty())
-                    <tfoot class="bg-surface-container-low/50">
+                    <tfoot class="bg-surface-container-low/50 print:bg-slate-50 border-t-2 border-primary/20">
                         <tr>
-                            <td colspan="3" class="px-6 py-4 font-bold text-sm text-right uppercase tracking-wider">Total Usage</td>
-                            <td class="px-6 py-4 text-right font-mono font-black text-primary">
-                                {{ number_format($reports->sum('kwh_usage'), 2) }} <span class="text-[10px]">kWh</span>
+                            <td colspan="3" class="px-6 py-4 font-black text-[10px] text-right uppercase tracking-widest">Grand Total Usage</td>
+                            <td class="px-6 py-4 text-right font-mono font-black text-primary text-sm">
+                                {{ number_format($reports->sum('kwh_usage'), 2) }} <span class="text-[9px]">kWh</span>
                             </td>
                         </tr>
                     </tfoot>
@@ -116,6 +140,20 @@
                 </table>
             </div>
             
+            <!-- Signature Block (Print Only) -->
+            <div class="hidden print:grid grid-cols-2 gap-20 mt-16 px-10">
+                <div class="text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-outline mb-16">Prepared By</p>
+                    <div class="border-b border-on-surface w-40 mx-auto"></div>
+                    <p class="text-[10px] font-bold mt-2">Operator/Engineering</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-outline mb-16">Authorized By</p>
+                    <div class="border-b border-on-surface w-40 mx-auto"></div>
+                    <p class="text-[10px] font-bold mt-2">Plant Manager</p>
+                </div>
+            </div>
+
             @if(method_exists($reports, 'hasPages') && $reports->hasPages())
             <div class="px-6 py-4 border-t border-outline-variant/10 no-print">
                 {{ $reports->appends(request()->query())->links() }}
@@ -147,7 +185,11 @@
 
 <style>
     @media print {
-        header, aside, .no-print, nav {
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        header, aside, .no-print, nav, .fixed {
             display: none !important;
         }
         main {
@@ -156,6 +198,10 @@
         }
         .print\:shadow-none { box-shadow: none !important; }
         .print\:border-none { border: none !important; }
+        body {
+            background: white !important;
+            color: black !important;
+        }
     }
 </style>
 

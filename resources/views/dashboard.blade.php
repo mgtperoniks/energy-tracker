@@ -75,37 +75,71 @@
                     </div>
                 </div>
                 
-                <!-- SVG Chart Representation -->
+                <!-- Real Chart Canvas -->
                 <div class="w-full h-64 relative">
-                    <svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 300">
-                        <!-- Grid Lines -->
-                        <line opacity="0.2" stroke="#bec8d0" stroke-dasharray="4" stroke-width="1" x1="0" x2="1000" y1="50" y2="50"></line>
-                        <line opacity="0.2" stroke="#bec8d0" stroke-dasharray="4" stroke-width="1" x1="0" x2="1000" y1="150" y2="150"></line>
-                        <line opacity="0.2" stroke="#bec8d0" stroke-dasharray="4" stroke-width="1" x1="0" x2="1000" y1="250" y2="250"></line>
-                        
-                        <!-- Main Trend Line -->
-                        <path d="M0,220 L100,210 L200,240 L300,180 L400,150 L500,190 L600,120 L700,100 L800,140 L900,110 L1000,130" fill="none" stroke="#00628c" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
-                        
-                        <!-- Points -->
-                        <circle cx="700" cy="100" fill="#00628c" r="5"></circle>
-                        <circle cx="1000" cy="130" fill="#00628c" r="4"></circle>
-                    </svg>
-
-                    <!-- Axis Labels -->
-                    <div class="absolute inset-0 flex flex-col justify-between pointer-events-none py-2">
-                        <span class="text-[10px] font-bold text-on-surface-variant opacity-50">250kW</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant opacity-50">150kW</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant opacity-50">50kW</span>
-                    </div>
-
-                    <div class="flex justify-between mt-4">
-                        <span class="text-[10px] font-bold text-on-surface-variant">00:00</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant">06:00</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant">12:00</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant">18:00</span>
-                        <span class="text-[10px] font-bold text-on-surface-variant">NOW</span>
-                    </div>
+                    <canvas id="dashboardChart"></canvas>
                 </div>
+
+                <script src="{{ asset('assets/js/chart.js') }}"></script>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const ctx = document.getElementById('dashboardChart').getContext('2d');
+                        
+                        const labels = {!! json_encode($chartLabels) !!};
+                        const values = {!! json_encode($chartValues) !!};
+
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels.length > 0 ? labels : ['00:00', '06:00', '12:00', '18:00'],
+                                datasets: [{
+                                    label: 'Aggregate Power (kW)',
+                                    data: values.length > 0 ? values : [0, 0, 0, 0],
+                                    fill: true,
+                                    backgroundColor: 'rgba(0, 98, 140, 0.1)',
+                                    borderColor: '#00628c',
+                                    borderWidth: 3,
+                                    pointRadius: 4,
+                                    pointBackgroundColor: '#00628c',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        backgroundColor: '#191c1e',
+                                        padding: 12,
+                                        cornerRadius: 8,
+                                        titleFont: { size: 12, weight: 'bold' },
+                                        bodyFont: { size: 13 },
+                                        callbacks: {
+                                            label: (context) => ` Load: ${context.parsed.y.toFixed(2)} kW`
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                                        ticks: {
+                                            font: { size: 10, weight: 'bold' },
+                                            callback: (value) => value + 'kW'
+                                        }
+                                    },
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: { font: { size: 10, weight: 'bold' } }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                </script>
             </div>
 
             <!-- Secondary Data Visualization / Status Summary -->

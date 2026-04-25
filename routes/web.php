@@ -25,7 +25,17 @@ Route::middleware('auth')->group(function () {
         // Detailed machine list for the dashboard table
         $machines = \App\Models\Machine::with(['latestReading', 'todaySummary'])->get();
 
-        return view('dashboard', compact('todayKwh', 'monthKwh', 'currentKw', 'machines'));
+        // Chart Data: Aggregate Power (kW) per hour for last 24 hours
+        $chartReadings = \App\Models\PowerReading::where('recorded_at', '>=', now()->subHours(24))
+            ->selectRaw('DATE_FORMAT(recorded_at, "%H:00") as hour, AVG(power_kw) as avg_kw')
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get();
+
+        $chartLabels = $chartReadings->pluck('hour');
+        $chartValues = $chartReadings->pluck('avg_kw');
+
+        return view('dashboard', compact('todayKwh', 'monthKwh', 'currentKw', 'machines', 'chartLabels', 'chartValues'));
     })->name('dashboard');
 
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
