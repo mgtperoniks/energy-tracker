@@ -66,6 +66,14 @@ Route::middleware('auth')->group(function () {
                 $historyVoltage[] = $point->voltage;
             }
 
+            // If the last reading is more than 15 minutes ago, 
+            // force the chart to drop to 0 at the current time
+            if ($history->isNotEmpty() && $history->last()->recorded_at->diffInMinutes(now()) > 15) {
+                $historyLabels[] = now()->format('H:i');
+                $historyValues[] = 0;
+                $historyVoltage[] = 0;
+            }
+
             // Calculate today's consumption from kwh_total difference
             $todayReadings = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
                         ->whereDate('recorded_at', today())
