@@ -41,17 +41,19 @@ Route::middleware('auth')->group(function () {
         // Fetch Power History (Kw) for the past 24 hours for chart
         $historyLabels = [];
         $historyValues = [];
+        $historyVoltage = [];
         $todayConsumption = 0;
         if ($machine) {
             $deviceIds = $machine->devices->pluck('id');
             $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
                         ->where('recorded_at', '>=', now()->subHours(24))
                         ->orderBy('recorded_at', 'asc')
-                        ->get(['recorded_at', 'power_kw', 'kwh_total']);
+                        ->get(['recorded_at', 'power_kw', 'kwh_total', 'voltage']);
             
             foreach ($history as $point) {
                 $historyLabels[] = $point->recorded_at->format('H:i');
                 $historyValues[] = $point->power_kw;
+                $historyVoltage[] = $point->voltage;
             }
 
             // Calculate today's consumption from kwh_total difference
@@ -73,7 +75,7 @@ Route::middleware('auth')->group(function () {
             }
         }
 
-        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'todayConsumption'));
+        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'historyVoltage', 'todayConsumption'));
     })->name('machines');
 
 

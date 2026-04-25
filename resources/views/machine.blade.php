@@ -79,12 +79,16 @@
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="text-lg font-bold tracking-tight text-on-surface">Power History</h2>
-                    <p class="text-xs text-on-surface-variant">Active Load (kW) over last 24 hours</p>
+                    <p class="text-xs text-on-surface-variant">Active Load (kW) & Voltage (V) over last 24 hours</p>
                 </div>
-                <div class="flex gap-4">
+                <div class="flex gap-6">
                     <div class="flex items-center gap-2">
-                        <span class="w-3 h-3 bg-primary rounded-sm"></span>
+                        <span class="w-3 h-3 rounded-sm" style="background:#00628c"></span>
                         <span class="text-xs font-bold text-on-surface">Active Power (kW)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-sm" style="background:#f97316"></span>
+                        <span class="text-xs font-bold text-on-surface">Voltage (V)</span>
                     </div>
                 </div>
             </div>
@@ -101,30 +105,47 @@
                 const ctx = document.getElementById('powerChart').getContext('2d');
                 
                 // Fetch data from PHP
-                const labels = {!! json_encode($historyLabels) !!};
-                const values = {!! json_encode($historyValues) !!};
+                const labels   = {!! json_encode($historyLabels) !!};
+                const values   = {!! json_encode($historyValues) !!};
+                const voltages = {!! json_encode($historyVoltage) !!};
 
                 const powerChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: 'Active Power',
-                            data: values,
-                            fill: true,
-                            backgroundColor: 'rgba(0, 98, 140, 0.1)',
-                            borderColor: '#00628c',
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            pointHoverRadius: 5,
-                            tension: 0.3,
-                            segment: {
-                                borderColor: ctx => {
-                                    if (ctx.p1.parsed.y > 40) return '#fb7185'; // Highlight spikes in red
-                                    return undefined;
+                        datasets: [
+                            {
+                                label: 'Active Power (kW)',
+                                data: values,
+                                yAxisID: 'y',
+                                fill: true,
+                                backgroundColor: 'rgba(0, 98, 140, 0.08)',
+                                borderColor: '#00628c',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                pointHoverRadius: 5,
+                                tension: 0.3,
+                                segment: {
+                                    borderColor: ctx => {
+                                        if (ctx.p1.parsed.y > 40) return '#fb7185';
+                                        return undefined;
+                                    }
                                 }
+                            },
+                            {
+                                label: 'Voltage (V)',
+                                data: voltages,
+                                yAxisID: 'y1',
+                                fill: false,
+                                borderColor: '#f97316',
+                                backgroundColor: 'rgba(249, 115, 22, 0.08)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                pointHoverRadius: 5,
+                                tension: 0.3,
+                                borderDash: [4, 3],
                             }
-                        }]
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -142,25 +163,41 @@
                                 padding: 12,
                                 cornerRadius: 8,
                                 callbacks: {
-                                    afterBody: function(items) {
-                                        let kw = items[0].parsed.y;
-                                        let load = ((kw / 50) * 100).toFixed(1);
-                                        return 'Load: ' + load + '%';
+                                    label: function(item) {
+                                        if (item.datasetIndex === 0) {
+                                            return ' Power: ' + item.parsed.y.toFixed(2) + ' kW';
+                                        }
+                                        return ' Voltage: ' + item.parsed.y.toFixed(1) + ' V';
                                     }
                                 }
                             }
                         },
                         scales: {
                             y: {
-                                beginAtZero: true,
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: false,
                                 grid: {
                                     color: 'rgba(148, 163, 184, 0.1)',
                                     drawBorder: false
                                 },
                                 ticks: {
                                     font: { size: 10, family: 'JetBrains Mono', weight: 'bold' },
-                                    color: '#94a3b8',
+                                    color: '#00628c',
                                     callback: function(value) { return value.toFixed(1) + ' kW'; }
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: false,
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                                ticks: {
+                                    font: { size: 10, family: 'JetBrains Mono', weight: 'bold' },
+                                    color: '#f97316',
+                                    callback: function(value) { return value.toFixed(0) + ' V'; }
                                 }
                             },
                             x: {
@@ -183,6 +220,7 @@
                 });
             });
         </script>
+
 
         <!-- Recent Readings Log -->
         <div class="bg-surface-container-lowest rounded-lg shadow-sm overflow-hidden">
