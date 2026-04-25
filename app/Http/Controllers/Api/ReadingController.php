@@ -35,13 +35,14 @@ class ReadingController extends Controller
             ], 404);
         }
 
+        $kwh_total = $validated['kwh_total'];
+
         // If offline and kwh_total is missing, use the last known kwh_total
         if ($kwh_total === null) {
             $lastReading = PowerReading::where('device_id', $device->id)
                                       ->orderBy('recorded_at', 'desc')
                                       ->first();
-            // If no previous data, use 0, but if we have incoming data, we shouldn't have hit this anyway.
-            // The real fix is ensuring we don't calculate a delta against a non-existent 0 baseline.
+            // If no previous data, use 0
             $kwh_total = $lastReading ? $lastReading->kwh_total : 0;
         }
 
