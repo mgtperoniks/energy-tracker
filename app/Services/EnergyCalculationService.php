@@ -47,9 +47,13 @@ class EnergyCalculationService
                 if ($diff >= 0) {
                     $totalUsage += $diff;
                 } else {
-                    // Meter reset or replaced. We add the new absolute value.
-                    // Meaning the usage since reset is just reading->kwh_total
-                    $totalUsage += $reading->kwh_total;
+                    // Meter reset or replaced. 
+                    // Only add the absolute value if it's reasonably small (e.g., < 50 kWh)
+                    // otherwise it's likely a data mismatch after cleanup or a major error.
+                    if ($reading->kwh_total < 50) {
+                        $totalUsage += $reading->kwh_total;
+                    }
+                    // If it's large, we ignore the jump to keep data integrity.
                 }
             }
             $previousReading = $reading;
