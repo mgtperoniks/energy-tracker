@@ -50,26 +50,26 @@
             <!-- Secondary Metrics -->
             <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Voltage</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading->voltage ?? 0, 1) }} <span class="text-sm font-medium text-outline">V</span></div>
+                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->voltage ?? 0, 1) }} <span class="text-sm font-medium text-outline">V</span></div>
                 <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
-                    <div class="bg-primary h-full" style="width: {{ min(($machine->latestReading->voltage ?? 0) / 400 * 100, 100) }}%"></div>
+                    <div class="bg-primary h-full" style="width: {{ min(($machine->latestReading?->voltage ?? 0) / 400 * 100, 100) }}%"></div>
                 </div>
             </div>
             
             <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Current</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading->current ?? 0, 1) }} <span class="text-sm font-medium text-outline">A</span></div>
+                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->current ?? 0, 1) }} <span class="text-sm font-medium text-outline">A</span></div>
                 <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
-                    <div class="bg-tertiary h-full" style="width: {{ min(($machine->latestReading->current ?? 0) / 100 * 100, 100) }}%"></div>
+                    <div class="bg-tertiary h-full" style="width: {{ min(($machine->latestReading?->current ?? 0) / 100 * 100, 100) }}%"></div>
                 </div>
             </div>
             
             <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Power Factor</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading->power_factor ?? 0, 2) }}</div>
-                <div class="mt-4 flex items-center gap-1 @if(($machine->latestReading->power_factor ?? 0) > 0.85) text-secondary @else text-rose-500 @endif text-[10px] font-bold">
-                    <span class="material-symbols-outlined text-xs">@if(($machine->latestReading->power_factor ?? 0) > 0.85) check_circle @else warning @endif</span>
-                    {{ ($machine->latestReading->power_factor ?? 0) > 0.85 ? 'OPTIMAL RANGE' : 'LOW PF DETECTED' }}
+                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->power_factor ?? 0, 2) }}</div>
+                <div class="mt-4 flex items-center gap-1 @if(($machine->latestReading?->power_factor ?? 0) > 0.85) text-secondary @else text-rose-500 @endif text-[10px] font-bold">
+                    <span class="material-symbols-outlined text-xs">@if(($machine->latestReading?->power_factor ?? 0) > 0.85) check_circle @else warning @endif</span>
+                    {{ ($machine->latestReading?->power_factor ?? 0) > 0.85 ? 'OPTIMAL RANGE' : 'LOW PF DETECTED' }}
                 </div>
             </div>
         </div>

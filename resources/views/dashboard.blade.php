@@ -191,7 +191,7 @@
                                     <span class="px-2 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase tracking-wide">Nominal</span>
                                 </td>
                                 <td class="px-6 py-5 text-right text-xs text-on-surface-variant">
-                                    {{ $machine->latestReading->recorded_at ? $machine->latestReading->recorded_at->diffForHumans() : 'No Data' }}
+                                    {{ $machine->latestReading ? ($machine->latestReading->recorded_at ? $machine->latestReading->recorded_at->diffForHumans() : 'No Data') : 'No Data' }}
                                 </td>
                             </tr>
                             @endforeach
