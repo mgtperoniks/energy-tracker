@@ -74,26 +74,14 @@ Route::middleware('auth')->group(function () {
                 $historyVoltage[] = 0;
             }
 
-            // Calculate today's consumption from kwh_total difference
-            $todayReadings = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
-                        ->whereDate('recorded_at', today())
-                        ->orderBy('recorded_at', 'asc')
-                        ->get(['kwh_total', 'power_kw', 'recorded_at']);
-
-            if ($todayReadings->count() >= 2) {
-                $kwhDiff = $todayReadings->last()->kwh_total - $todayReadings->first()->kwh_total;
-                if ($kwhDiff > 0) {
-                    $todayConsumption = round($kwhDiff, 2);
-                } else {
-                    // Estimate from average power × hours elapsed
-                    $avgKw = $todayReadings->avg('power_kw');
-                    $hoursElapsed = $todayReadings->first()->recorded_at->diffInMinutes($todayReadings->last()->recorded_at) / 60;
-                    $todayConsumption = round($avgKw * $hoursElapsed, 2);
-                }
-            }
+            // Use the pre-calculated today's consumption
+            $todayConsumption = $machine->todaySummary ? $machine->todaySummary->kwh_usage : 0;
+            
+            // Total Cumulative Energy from the latest reading
+            $totalEnergy = $machine->latestReading ? $machine->latestReading->kwh_total : 0;
         }
 
-        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'historyVoltage', 'todayConsumption'));
+        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'historyVoltage', 'todayConsumption', 'totalEnergy'));
     })->name('machines');
 
 

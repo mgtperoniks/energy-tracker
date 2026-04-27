@@ -47,6 +47,22 @@
                 </div>
             </div>
 
+            <!-- Total Energy Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm border-b-2 border-secondary-container">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-outline">Total Energy (Lifetime)</span>
+                    <span class="material-symbols-outlined text-secondary" data-icon="history">history</span>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-3xl font-black tracking-tight text-on-surface">{{ number_format($totalEnergy, 2) }}</span>
+                    <span class="text-sm font-bold text-outline">kWh</span>
+                </div>
+                <div class="mt-4 flex items-center gap-1 text-[10px] font-bold text-outline">
+                    <span class="material-symbols-outlined text-xs">database</span>
+                    Cumulative meter reading
+                </div>
+            </div>
+
             <!-- Secondary Metrics -->
             <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Voltage</span>

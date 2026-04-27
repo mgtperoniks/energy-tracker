@@ -59,6 +59,17 @@ class EnergyCalculationService
             $previousReading = $reading;
         }
 
+        // FALLBACK: If totalUsage is still 0 but we have readings, 
+        // it means kwh_total might not be increasing or is missing.
+        // Estimate from average power × hours elapsed.
+        if ($totalUsage <= 0 && $readings->count() >= 2) {
+            $avgKw = $readings->avg('power_kw');
+            $firstTime = $readings->first()->recorded_at;
+            $lastTime = $readings->last()->recorded_at;
+            $hoursElapsed = $firstTime->diffInSeconds($lastTime) / 3600;
+            $totalUsage = round($avgKw * $hoursElapsed, 2);
+        }
+
         // Store into daily summaries
         if ($totalUsage > 0) {
             DailyEnergySummary::updateOrCreate(
