@@ -27,7 +27,7 @@ Route::middleware('auth')->group(function () {
         $machines = \App\Models\Machine::with(['latestReading', 'todaySummary'])->get();
 
         // Chart Data: Aggregate Power (kW) per hour for last 12 hours
-        $chartReadings = \App\Models\PowerReading::where('recorded_at', '>=', now()->subHours(12)->format('Y-m-d H:i:s'))
+        $chartReadings = \App\Models\PowerReading::whereRaw('recorded_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)')
             ->selectRaw('DATE_FORMAT(recorded_at, "%H:00") as hour, AVG(power_kw) as avg_kw')
             ->groupBy('hour')
             ->orderBy('hour')
@@ -66,7 +66,7 @@ Route::middleware('auth')->group(function () {
             $deviceIds = $machine->devices->pluck('id');
 
             $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
-                        ->where('recorded_at', '>=', now()->subHours(12)->format('Y-m-d H:i:s'))
+                        ->whereRaw('recorded_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)')
                         ->orderBy('recorded_at', 'asc')
                         ->get(['recorded_at', 'power_kw', 'kwh_total', 'voltage']);
 
