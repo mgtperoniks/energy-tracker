@@ -43,45 +43,62 @@ Route::middleware('auth')->group(function () {
     Route::get('/machines/{id?}', function ($id = null) {
         $machine = null;
         if ($id) {
-            $machine = \App\Models\Machine::with(['devices', 'latestReading', 'todaySummary', 'recentReadings'])->find($id);
+            $machine = \App\Models\Machine::with([
+                'devices', 'latestReading', 'todaySummary', 'recentReadings', 'meterResets'
+            ])->find($id);
         } else {
-            $machine = \App\Models\Machine::with(['devices', 'latestReading', 'todaySummary', 'recentReadings'])->first();
+            $machine = \App\Models\Machine::with([
+                'devices', 'latestReading', 'todaySummary', 'recentReadings', 'meterResets'
+            ])->first();
         }
 
-        // Fetch Power History (Kw) for the past 24 hours for chart
-        $historyLabels = [];
-        $historyValues = [];
-        $historyVoltage = [];
+        // Fetch Power History (kW & Voltage) for the past 24 hours for chart
+        $historyLabels    = [];
+        $historyValues    = [];
+        $historyVoltage   = [];
         $todayConsumption = 0;
+        $totalEnergy      = 0;   // Lifetime cumulative kWh
+        $currentMeterKwh  = 0;   // Raw value on meter display right now
+
         if ($machine) {
             $deviceIds = $machine->devices->pluck('id');
+
             $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
                         ->where('recorded_at', '>=', now()->subHours(24))
                         ->orderBy('recorded_at', 'asc')
                         ->get(['recorded_at', 'power_kw', 'kwh_total', 'voltage']);
-            
+
             foreach ($history as $point) {
-                $historyLabels[] = $point->recorded_at->format('H:i');
-                $historyValues[] = $point->power_kw;
+                $historyLabels[]  = $point->recorded_at->format('H:i');
+                $historyValues[]  = $point->power_kw;
                 $historyVoltage[] = $point->voltage;
             }
 
-            // If the last reading is more than 15 minutes ago, 
-            // force the chart to drop to 0 at the current time
+            // Drop chart to 0 if meter has been silent for >15 min
             if ($history->isNotEmpty() && $history->last()->recorded_at->diffInMinutes(now()) > 15) {
-                $historyLabels[] = now()->format('H:i');
-                $historyValues[] = 0;
+                $historyLabels[]  = now()->format('H:i');
+                $historyValues[]  = 0;
                 $historyVoltage[] = 0;
             }
 
-            // Use the pre-calculated today's consumption
-            $todayConsumption = $machine->todaySummary ? $machine->todaySummary->kwh_usage : 0;
-            
-            // Total Cumulative Energy from the latest reading
-            $totalEnergy = $machine->latestReading ? $machine->latestReading->kwh_total : 0;
+            $todayConsumption = $machine->todaySummary?->kwh_usage ?? 0;
+
+            // Raw meter reading (what the physical device shows right now)
+            $currentMeterKwh = $machine->latestReading?->kwh_total ?? 0;
+
+            // TRUE lifetime total = baseline (all past periods) + current meter reading
+            $totalEnergy = $machine->lifetime_kwh;
         }
 
-        return view('machine', compact('machine', 'historyLabels', 'historyValues', 'historyVoltage', 'todayConsumption', 'totalEnergy'));
+        return view('machine', compact(
+            'machine',
+            'historyLabels',
+            'historyValues',
+            'historyVoltage',
+            'todayConsumption',
+            'totalEnergy',      // Lifetime cumulative (what we show as "Total Energy")
+            'currentMeterKwh'   // Raw meter value (for reference / popup)
+        ));
     })->name('machines');
 
 

@@ -57,9 +57,15 @@
                     <span class="text-3xl font-black tracking-tight text-on-surface">{{ number_format($totalEnergy, 2) }}</span>
                     <span class="text-sm font-bold text-outline">kWh</span>
                 </div>
-                <div class="mt-4 flex items-center gap-1 text-[10px] font-bold text-outline">
-                    <span class="material-symbols-outlined text-xs">database</span>
-                    Cumulative meter reading
+                <div class="mt-3 space-y-1">
+                    <div class="flex items-center gap-1 text-[10px] font-bold text-outline">
+                        <span class="material-symbols-outlined text-xs">database</span>
+                        Baseline: {{ number_format($machine->kwh_baseline, 2) }} kWh
+                    </div>
+                    <div class="flex items-center gap-1 text-[10px] font-medium text-secondary">
+                        <span class="material-symbols-outlined text-xs">electric_meter</span>
+                        Meter now: {{ number_format($currentMeterKwh, 2) }} kWh
+                    </div>
                 </div>
             </div>
 
@@ -299,6 +305,68 @@
             </div>
         </div>
     </div>
+
+    {{-- ====================================================
+         METER RESET HISTORY PANEL
+         Shows all logged reset events with a button to log a new one.
+    ====================================================== --}}
+    <div class="p-6 md:p-8 max-w-7xl mx-auto">
+        <div class="bg-surface-container-lowest rounded-lg shadow-sm overflow-hidden">
+            <div class="px-8 py-4 border-b border-surface-container-low flex justify-between items-center">
+                <div>
+                    <h2 class="text-sm font-bold tracking-tight text-on-surface uppercase">Meter Reset History</h2>
+                    <p class="text-[10px] text-outline mt-0.5">Riwayat reset counter energy meter fisik</p>
+                </div>
+                {{-- Button to log a manual reset (disabled until 1 May or as needed) --}}
+                <button id="btn-log-reset"
+                    data-machine-id="{{ $machine->id }}"
+                    data-machine-name="{{ $machine->name }}"
+                    data-current-kwh="{{ number_format($currentMeterKwh, 2) }}"
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-md transition-colors flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">restart_alt</span>
+                    Log Reset Meter
+                </button>
+            </div>
+
+            @if($machine->meterResets->isEmpty())
+                <div class="px-8 py-6 text-center text-outline italic text-sm">
+                    Belum ada reset meter tercatat. Total Energy = Baseline + Meter saat ini.
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-surface-container-low text-[10px] font-black text-on-surface-variant uppercase tracking-widest">
+                                <th class="px-8 py-3">Reset At</th>
+                                <th class="px-4 py-3 text-right">kWh at Reset</th>
+                                <th class="px-4 py-3">Notes</th>
+                                <th class="px-4 py-3">By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($machine->meterResets as $reset)
+                            <tr class="border-b border-surface-container-low text-sm">
+                                <td class="px-8 py-3 font-mono text-xs">{{ $reset->reset_at->format('d M Y H:i') }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-secondary">{{ number_format($reset->kwh_at_reset, 2) }} kWh</td>
+                                <td class="px-4 py-3 text-on-surface-variant text-xs">{{ $reset->notes ?? '-' }}</td>
+                                <td class="px-4 py-3 text-xs">{{ $reset->performedBy?->name ?? 'System' }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+
+            <div class="px-8 py-3 bg-surface-container-low">
+                <p class="text-[10px] text-outline">
+                    <strong>Total Lifetime kWh</strong> =
+                    Baseline <strong>{{ number_format($machine->kwh_baseline, 2) }} kWh</strong>
+                    + Meter sekarang <strong>{{ number_format($currentMeterKwh, 2) }} kWh</strong>
+                    = <strong class="text-primary">{{ number_format($totalEnergy, 2) }} kWh</strong>
+                </p>
+            </div>
+        </div>
+    </div>
 </main>
 
 <!-- Details Modal -->
@@ -485,6 +553,67 @@
     document.getElementById('details-modal').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
+
+    // --- LOG RESET METER BUTTON ---
+    const btnLogReset = document.getElementById('btn-log-reset');
+    if (btnLogReset) {
+        btnLogReset.addEventListener('click', async function () {
+            const machineId   = this.dataset.machineId;
+            const machineName = this.dataset.machineName;
+            const currentKwh  = this.dataset.currentKwh;
+
+            const confirmed = confirm(
+                `⚠️ LOG RESET METER\n\n` +
+                `Mesin     : ${machineName}\n` +
+                `kWh sekarang: ${currentKwh} kWh\n\n` +
+                `Nilai ${currentKwh} kWh akan ditambahkan ke baseline.\n` +
+                `Lakukan ini SEBELUM reset fisik di meter.\n\n` +
+                `Lanjutkan?`
+            );
+
+            if (!confirmed) return;
+
+            const notes = prompt(
+                'Masukkan catatan reset (opsional):',
+                'Reset tahunan - ' + new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+            );
+
+            this.disabled = true;
+            this.innerText = 'SAVING...';
+
+            try {
+                const response = await fetch(`/api/machines/${machineId}/reset`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({ notes: notes || '' })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    alert(
+                        `✅ Reset berhasil dicatat!\n\n` +
+                        `kWh at reset : ${result.data.kwh_at_reset} kWh\n` +
+                        `Baseline baru: ${result.data.new_baseline} kWh\n\n` +
+                        `Sekarang Anda bisa reset counter fisik di power meter.\n` +
+                        `Halaman akan di-refresh.`
+                    );
+                    window.location.reload();
+                } else {
+                    alert('❌ Gagal mencatat reset: ' + (result.message || 'Unknown error'));
+                    this.disabled = false;
+                    this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log Reset Meter';
+                }
+            } catch (err) {
+                alert('❌ Error: ' + err.message);
+                this.disabled = false;
+                this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log Reset Meter';
+            }
+        });
+    }
 </script>
 @endsection
 

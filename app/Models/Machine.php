@@ -11,6 +11,10 @@ class Machine extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'kwh_baseline' => 'float',
+    ];
+
     public function location()
     {
         return $this->belongsTo(Location::class);
@@ -26,15 +30,20 @@ class Machine extends Model
         return $this->hasMany(DailyEnergySummary::class);
     }
 
+    public function meterResets()
+    {
+        return $this->hasMany(MeterReset::class)->orderBy('reset_at', 'desc');
+    }
+
     public function latestReading()
     {
         return $this->hasOneThrough(
             PowerReading::class,
             Device::class,
-            'machine_id', // Foreign key on devices table
-            'device_id',  // Foreign key on power_readings table
-            'id',         // Local key on machines table
-            'id'          // Local key on devices table
+            'machine_id', // FK on devices
+            'device_id',  // FK on power_readings
+            'id',         // PK on machines
+            'id'          // PK on devices
         )->latest('recorded_at');
     }
 
@@ -54,5 +63,18 @@ class Machine extends Model
             'id',
             'id'
         )->orderBy('recorded_at', 'desc')->limit(10);
+    }
+
+    /**
+     * Lifetime cumulative kWh = baseline (from all past periods before resets)
+     *                         + current meter reading (since last reset).
+     *
+     * This gives the same number as the physical meter would if it had
+     * never been reset.
+     */
+    public function getLifetimeKwhAttribute(): float
+    {
+        $currentMeterKwh = $this->latestReading?->kwh_total ?? 0;
+        return ($this->kwh_baseline ?? 0) + $currentMeterKwh;
     }
 }
