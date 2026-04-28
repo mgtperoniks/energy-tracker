@@ -496,26 +496,48 @@
 
                     if (result.status === 'success' && result.data.length > 0) {
                         const tbody = document.querySelector('tbody');
+
+                        /**
+                         * Format ISO 8601 timestamp from API to the same style
+                         * as Blade's recorded_at (e.g. "2026-04-28 09:21:52").
+                         * The server stores UTC; Laravel displays in app timezone (Asia/Jakarta = UTC+7).
+                         * We replicate that by adding 7 hours offset here.
+                         */
+                        function formatTimestamp(isoString) {
+                            // Parse the ISO string as UTC
+                            const d = new Date(isoString);
+                            // Add WIB offset (UTC+7 = 7 * 60 minutes)
+                            const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+                            const yyyy = wib.getUTCFullYear();
+                            const mm   = String(wib.getUTCMonth() + 1).padStart(2, '0');
+                            const dd   = String(wib.getUTCDate()).padStart(2, '0');
+                            const hh   = String(wib.getUTCHours()).padStart(2, '0');
+                            const min  = String(wib.getUTCMinutes()).padStart(2, '0');
+                            const ss   = String(wib.getUTCSeconds()).padStart(2, '0');
+                            return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+                        }
+
                         result.data.forEach(row => {
                             const tr = document.createElement('tr');
                             tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
-                            
-                            const power = parseFloat(row.power_kw);
-                            const statusHtml = power > 40 
+
+                            const power     = parseFloat(row.power_kw);
+                            const timestamp = formatTimestamp(row.recorded_at);  // ← formatted
+                            const statusHtml = power > 40
                                 ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
-                                : (power <= 0 
+                                : (power <= 0
                                     ? '<span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>'
                                     : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>');
 
                             tr.innerHTML = `
-                                <td class="px-8 py-4 font-mono text-xs">${row.recorded_at}</td>
+                                <td class="px-8 py-4 font-mono text-xs">${timestamp}</td>
                                 <td class="px-4 py-4 text-right font-bold text-primary">${power.toFixed(2)}</td>
                                 <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
                                 <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
                                 <td class="px-4 py-4 text-center">${statusHtml}</td>
                                 <td class="px-8 py-4 text-right">
-                                    <button class="text-primary hover:underline text-xs font-bold detail-btn" 
-                                        data-timestamp="${row.recorded_at}"
+                                    <button class="text-primary hover:underline text-xs font-bold detail-btn"
+                                        data-timestamp="${timestamp}"
                                         data-power="${power.toFixed(2)}"
                                         data-voltage="${parseFloat(row.voltage).toFixed(1)}"
                                         data-current="${parseFloat(row.current).toFixed(1)}"
