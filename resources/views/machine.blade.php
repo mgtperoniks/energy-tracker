@@ -28,13 +28,13 @@
         <!-- Metrics Bento Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <!-- Big Aggregate Metric -->
-            <div class="lg:col-span-2 bg-surface-container-lowest p-6 rounded-lg shadow-sm border-b-2 border-primary-container">
+            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm border-b-2 border-primary-container">
                 <div class="flex justify-between items-start mb-4">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-outline">Consumption (Today)</span>
                     <span class="material-symbols-outlined text-primary" data-icon="electric_bolt">electric_bolt</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-5xl font-black tracking-tight text-on-surface">{{ number_format($todayConsumption, 1) }}</span>
+                    <span class="text-3xl font-black tracking-tight text-on-surface">{{ number_format($todayConsumption, 1) }}</span>
                     <span class="text-xl font-bold text-outline">kWh</span>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-secondary text-sm font-bold">
@@ -48,13 +48,13 @@
             </div>
 
             <!-- Total Energy Card -->
-            <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm border-b-2 border-secondary-container">
+            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm border-b-2 border-secondary-container">
                 <div class="flex justify-between items-start mb-4">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-outline">Total Energy (Lifetime)</span>
                     <span class="material-symbols-outlined text-secondary" data-icon="history">history</span>
                 </div>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-3xl font-black tracking-tight text-on-surface">{{ number_format($totalEnergy, 2) }}</span>
+                    <span class="text-2xl font-black tracking-tight text-on-surface">{{ number_format($totalEnergy, 2) }}</span>
                     <span class="text-sm font-bold text-outline">kWh</span>
                 </div>
                 <div class="mt-3 space-y-1">
@@ -70,7 +70,7 @@
             </div>
 
             <!-- Secondary Metrics -->
-            <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
+            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Voltage</span>
                 <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->voltage ?? 0, 1) }} <span class="text-sm font-medium text-outline">V</span></div>
                 <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
@@ -78,7 +78,7 @@
                 </div>
             </div>
             
-            <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
+            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Current</span>
                 <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->current ?? 0, 1) }} <span class="text-sm font-medium text-outline">A</span></div>
                 <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
@@ -86,7 +86,7 @@
                 </div>
             </div>
             
-            <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm">
+            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Power Factor</span>
                 <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->power_factor ?? 0, 2) }}</div>
                 <div class="mt-4 flex items-center gap-1 @if(($machine->latestReading?->power_factor ?? 0) > 0.85) text-secondary @else text-rose-500 @endif text-[10px] font-bold">
