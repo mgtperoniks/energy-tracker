@@ -10,6 +10,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/', function () {
+        \Illuminate\Support\Facades\DB::statement("SET time_zone = '+07:00'");
         $todayKwh = \App\Models\DailyEnergySummary::where('date', today()->toDateString())->sum('kwh_usage');
         $monthKwh = \App\Models\DailyEnergySummary::whereYear('date', today()->year)
                         ->whereMonth('date', today()->month)
@@ -26,7 +27,7 @@ Route::middleware('auth')->group(function () {
         $machines = \App\Models\Machine::with(['latestReading', 'todaySummary'])->get();
 
         // Chart Data: Aggregate Power (kW) per hour for last 12 hours
-        $chartReadings = \App\Models\PowerReading::where('recorded_at', '>=', now()->subHours(12))
+        $chartReadings = \App\Models\PowerReading::where('recorded_at', '>=', now()->subHours(12)->format('Y-m-d H:i:s'))
             ->selectRaw('DATE_FORMAT(recorded_at, "%H:00") as hour, AVG(power_kw) as avg_kw')
             ->groupBy('hour')
             ->orderBy('hour')
@@ -41,6 +42,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
 
     Route::get('/machines/{id?}', function ($id = null) {
+        \Illuminate\Support\Facades\DB::statement("SET time_zone = '+07:00'");
         $machine = null;
         if ($id) {
             $machine = \App\Models\Machine::with([
@@ -64,7 +66,7 @@ Route::middleware('auth')->group(function () {
             $deviceIds = $machine->devices->pluck('id');
 
             $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
-                        ->where('recorded_at', '>=', now()->subHours(12))
+                        ->where('recorded_at', '>=', now()->subHours(12)->format('Y-m-d H:i:s'))
                         ->orderBy('recorded_at', 'asc')
                         ->get(['recorded_at', 'power_kw', 'kwh_total', 'voltage']);
 
