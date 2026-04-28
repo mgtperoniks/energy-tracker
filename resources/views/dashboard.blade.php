@@ -66,11 +66,11 @@
                 <div class="flex items-center justify-between mb-8">
                     <div>
                         <h3 class="text-lg font-bold tracking-tight text-on-surface leading-none">Power Consumption Trend</h3>
-                        <p class="text-xs text-on-surface-variant mt-1">24-hour aggregate industrial load (kW)</p>
+                        <p class="text-xs text-on-surface-variant mt-1">12-hour aggregate industrial load (kW)</p>
                     </div>
                     <div class="flex bg-surface-container-low p-1 rounded-md">
                         <button class="px-3 py-1 text-xs font-bold bg-white shadow-sm rounded">Live</button>
-                        <button class="px-3 py-1 text-xs font-medium text-on-surface-variant">24H</button>
+                        <button class="px-3 py-1 text-xs font-medium text-on-surface-variant">12H</button>
                         <button class="px-3 py-1 text-xs font-medium text-on-surface-variant">7D</button>
                     </div>
                 </div>

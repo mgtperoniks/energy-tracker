@@ -101,7 +101,7 @@
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="text-lg font-bold tracking-tight text-on-surface">Power History</h2>
-                    <p class="text-xs text-on-surface-variant">Active Load (kW) & Voltage (V) over last 24 hours</p>
+                    <p class="text-xs text-on-surface-variant">Active Load (kW) & Voltage (V) over last 12 hours</p>
                 </div>
                 <div class="flex gap-6">
                     <div class="flex items-center gap-2">
