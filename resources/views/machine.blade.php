@@ -300,8 +300,28 @@
                 </table>
             </div>
             
-            <div class="p-4 bg-surface-container-low flex justify-center">
-                <button id="load-more-btn" data-machine-id="{{ $machine->id }}" data-offset="10" class="text-[10px] font-black text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors">Load Full History</button>
+            <div class="px-8 py-4 bg-surface-container-low flex flex-col md:flex-row justify-between items-center gap-4 border-t border-surface-container-low">
+                <div class="flex items-center gap-2">
+                    <button id="prev-page" class="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <div class="text-[10px] font-black text-on-surface-variant uppercase tracking-widest whitespace-nowrap">
+                        Page <span id="current-page-display">1</span> of <span id="last-page-display">1</span>
+                    </div>
+                    <button id="next-page" class="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] font-bold text-outline uppercase">Go to page:</span>
+                    <input type="number" id="jump-page-input" min="1" class="w-16 px-2 py-1 bg-white border border-outline-variant rounded text-xs font-mono font-bold text-center" placeholder="...">
+                    <button id="jump-page-btn" class="px-3 py-1 bg-primary text-white text-[10px] font-black rounded uppercase tracking-widest hover:brightness-110 transition-all">Go</button>
+                </div>
+                
+                <div class="text-[10px] text-outline font-medium uppercase tracking-tighter">
+                    Total: <span id="total-readings-display">0</span> records
+                </div>
             </div>
         </div>
     </div>
@@ -479,96 +499,120 @@
             }
         });
 
-        // Load More function
-        const loadMoreBtn = document.getElementById('load-more-btn');
-        if (loadMoreBtn) {
-            loadMoreBtn.addEventListener('click', async function() {
-                const machineId = this.dataset.machineId;
-                const offset = parseInt(this.dataset.offset);
-                const originalText = this.innerText;
-                this.innerText = 'LOADING...';
-                this.classList.add('opacity-50', 'cursor-not-allowed');
-                this.disabled = true;
-
-                try {
-                    const response = await fetch(`/api/machines/${machineId}/readings?offset=${offset}&limit=10`);
-                    const result = await response.json();
-
-                    if (result.status === 'success' && result.data.length > 0) {
-                        const tbody = document.querySelector('tbody');
-
-                        /**
-                         * Format ISO 8601 timestamp from API to the same style
-                         * as Blade's recorded_at (e.g. "2026-04-28 09:21:52").
-                         * The server stores UTC; Laravel displays in app timezone (Asia/Jakarta = UTC+7).
-                         * We replicate that by adding 7 hours offset here.
-                         */
-                        function formatTimestamp(isoString) {
-                            // Parse the ISO string as UTC
-                            const d = new Date(isoString);
-                            // Add WIB offset (UTC+7 = 7 * 60 minutes)
-                            const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-                            const yyyy = wib.getUTCFullYear();
-                            const mm   = String(wib.getUTCMonth() + 1).padStart(2, '0');
-                            const dd   = String(wib.getUTCDate()).padStart(2, '0');
-                            const hh   = String(wib.getUTCHours()).padStart(2, '0');
-                            const min  = String(wib.getUTCMinutes()).padStart(2, '0');
-                            const ss   = String(wib.getUTCSeconds()).padStart(2, '0');
-                            return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
-                        }
-
-                        result.data.forEach(row => {
-                            const tr = document.createElement('tr');
-                            tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
-
-                            const power     = parseFloat(row.power_kw);
-                            const timestamp = formatTimestamp(row.recorded_at);  // ← formatted
-                            const statusHtml = power > 40
-                                ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
-                                : (power <= 0
-                                    ? '<span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>'
-                                    : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>');
-
-                            tr.innerHTML = `
-                                <td class="px-8 py-4 font-mono text-xs">${timestamp}</td>
-                                <td class="px-4 py-4 text-right font-bold text-primary">${power.toFixed(2)}</td>
-                                <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
-                                <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
-                                <td class="px-4 py-4 text-center">${statusHtml}</td>
-                                <td class="px-8 py-4 text-right">
-                                    <button class="text-primary hover:underline text-xs font-bold detail-btn"
-                                        data-timestamp="${timestamp}"
-                                        data-power="${power.toFixed(2)}"
-                                        data-voltage="${parseFloat(row.voltage).toFixed(1)}"
-                                        data-current="${parseFloat(row.current).toFixed(1)}"
-                                        data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
-                                        data-kwh="${parseFloat(row.kwh_total).toFixed(2)}">
-                                        Details
-                                    </button>
-                                </td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-
-                        this.dataset.offset = offset + result.data.length;
-                        this.innerText = originalText;
-                        this.classList.remove('opacity-50', 'cursor-not-allowed');
-                        this.disabled = false;
-                        
-                        if (result.data.length < 10) {
-                            this.remove(); // No more data
-                        }
-                    } else {
-                        this.remove();
-                    }
-                } catch (error) {
-                    console.error('Error loading more readings:', error);
-                    this.innerText = originalText;
-                    this.classList.remove('opacity-50', 'cursor-not-allowed');
-                    this.disabled = false;
-                }
-            });
+        let currentPage = 1;
+        let lastPage = 1;
+        const machineId = "{{ $machine->id }}";
+        
+        // Helper to format timestamp
+        function formatTimestamp(isoString) {
+            const d = new Date(isoString);
+            const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+            const yyyy = wib.getUTCFullYear();
+            const mm   = String(wib.getUTCMonth() + 1).padStart(2, '0');
+            const dd   = String(wib.getUTCDate()).padStart(2, '0');
+            const hh   = String(wib.getUTCHours()).padStart(2, '0');
+            const min  = String(wib.getUTCMinutes()).padStart(2, '0');
+            const ss   = String(wib.getUTCSeconds()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
         }
+
+        async function fetchReadings(page = 1) {
+            const tbody = document.querySelector('tbody');
+            const nextBtn = document.getElementById('next-page');
+            const prevBtn = document.getElementById('prev-page');
+            const pageDisplay = document.getElementById('current-page-display');
+            const lastPageDisplay = document.getElementById('last-page-display');
+            const totalDisplay = document.getElementById('total-readings-display');
+
+            try {
+                const response = await fetch(`/api/machines/${machineId}/readings?page=${page}&limit=15`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const paginator = result.data;
+                    const readings = paginator.data;
+                    
+                    // Clear current table
+                    tbody.innerHTML = '';
+                    
+                    if (readings.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="px-8 py-10 text-center text-outline italic">No data found for this page.</td></tr>';
+                    }
+
+                    readings.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
+
+                        const power     = parseFloat(row.power_kw);
+                        const timestamp = formatTimestamp(row.recorded_at);
+                        const statusHtml = power > 40
+                            ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
+                            : (power <= 0
+                                ? '<span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>'
+                                : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>');
+
+                        tr.innerHTML = `
+                            <td class="px-8 py-4 font-mono text-xs">${timestamp}</td>
+                            <td class="px-4 py-4 text-right font-bold text-primary">${power.toFixed(2)}</td>
+                            <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
+                            <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
+                            <td class="px-4 py-4 text-center">${statusHtml}</td>
+                            <td class="px-8 py-4 text-right">
+                                <button class="text-primary hover:underline text-xs font-bold detail-btn"
+                                    data-timestamp="${timestamp}"
+                                    data-power="${power.toFixed(2)}"
+                                    data-voltage="${parseFloat(row.voltage).toFixed(1)}"
+                                    data-current="${parseFloat(row.current).toFixed(1)}"
+                                    data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
+                                    data-kwh="${parseFloat(row.kwh_total).toFixed(2)}">
+                                    Details
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    // Update UI controls
+                    currentPage = paginator.current_page;
+                    lastPage = paginator.last_page;
+                    
+                    pageDisplay.innerText = currentPage;
+                    lastPageDisplay.innerText = lastPage;
+                    totalDisplay.innerText = paginator.total;
+                    
+                    prevBtn.disabled = currentPage <= 1;
+                    nextBtn.disabled = currentPage >= lastPage;
+                    
+                    // Scroll to top of table if needed
+                    // tbody.closest('.overflow-x-auto').scrollTop = 0;
+                }
+            } catch (error) {
+                console.error('Error fetching readings:', error);
+            }
+        }
+
+        // Event listeners for pagination
+        document.getElementById('next-page').addEventListener('click', () => {
+            if (currentPage < lastPage) fetchReadings(currentPage + 1);
+        });
+
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (currentPage > 1) fetchReadings(currentPage - 1);
+        });
+
+        document.getElementById('jump-page-btn').addEventListener('click', () => {
+            const val = parseInt(document.getElementById('jump-page-input').value);
+            if (val >= 1 && val <= lastPage) {
+                fetchReadings(val);
+            } else {
+                alert(`Please enter a page between 1 and ${lastPage}`);
+            }
+        });
+
+        // Initial fetch only if user clicks or on load? 
+        // Let's stick with initial Blade data for page 1, but we need total count
+        // For simplicity, let's just trigger a fetch on load to initialize the paginator
+        fetchReadings(1);
     });
 
     // Close modal on background click

@@ -40,16 +40,13 @@ class MachineController extends Controller
     public function readings($id, Request $request)
     {
         $machine = Machine::findOrFail($id);
-        $offset = (int) $request->get('offset', 0);
-        $limit = (int) $request->get('limit', 10);
+        $limit = (int) $request->get('limit', 15); // Show 15 per page
 
         $readings = \App\Models\PowerReading::whereIn('device_id', function($query) use ($machine) {
                         $query->select('id')->from('devices')->where('machine_id', $machine->id);
                     })
                     ->orderBy('recorded_at', 'desc')
-                    ->skip($offset)
-                    ->take($limit)
-                    ->get();
+                    ->paginate($limit);
 
         return response()->json([
             'status' => 'success',
