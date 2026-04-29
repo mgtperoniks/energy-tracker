@@ -112,7 +112,7 @@
                     </div>
                 </div>
             </div>
-            <div class="h-[220px] w-full">
+            <div class="h-[330px] w-full">
                 <canvas id="powerChart"></canvas>
             </div>
         </div>
@@ -409,9 +409,11 @@
                 return;
             }
 
+            const powerData = data.map(item => item.power_kw || 0);
+            const actualMaxPower = powerData.length > 0 ? Math.max(...powerData) : 0;
+            const powerAxisMax = Math.max(actualMaxPower * 1.1, 6.8);
+
             const voltageData = data.map(item => item.voltage || 0);
-            const minVoltage = voltageData.length > 0 ? Math.min(...voltageData.filter(v => v > 0)) : 0;
-            const voltageAxisMin = (minVoltage >= 380) ? 380 : 0;
 
             const labels = data.map(item => {
                 const d = new Date(item.timestamp);
@@ -428,14 +430,14 @@
                 unit = 'kW';
                 datasets.push({
                     label: 'Active Power (kW)',
-                    data: data.map(item => item.power_kw || 0),
+                    data: powerData,
                     yAxisID: 'y_power',
                     fill: true,
                     backgroundColor: 'rgba(0, 98, 140, 0.08)',
                     borderColor: '#00628c',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.3
+                    tension: 0.25
                 });
                 
                 // Add Voltage as secondary dataset
@@ -474,7 +476,7 @@
                     borderColor: '#10b981',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.3
+                    tension: 0.25
                 });
             } else if (currentMetric === 'pf') {
                 unit = '';
@@ -485,7 +487,7 @@
                     borderColor: '#8b5cf6',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.3
+                    tension: 0.25
                 });
             }
 
@@ -526,8 +528,8 @@
                             grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false }, 
                             ticks: { font: { size: 9 } },
                             title: { display: true, text: (currentMetric === 'power' ? 'kW' : unit), font: { size: 9, weight: 'bold' } },
-                            min: (currentMetric === 'voltage' ? voltageAxisMin : undefined),
-                            max: (currentMetric === 'voltage' ? 550 : undefined)
+                            min: 0,
+                            max: (currentMetric === 'power' ? powerAxisMax : (currentMetric === 'voltage' ? 600 : undefined))
                         },
                         y_voltage: {
                             type: 'linear',
@@ -536,8 +538,8 @@
                             grid: { drawOnChartArea: false },
                             ticks: { font: { size: 9 } },
                             title: { display: true, text: 'V', font: { size: 9, weight: 'bold' } },
-                            min: voltageAxisMin,
-                            max: 550
+                            min: 0,
+                            max: 600
                         },
                         x: { 
                             grid: { display: false }, 
