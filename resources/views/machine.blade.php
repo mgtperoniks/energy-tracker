@@ -357,59 +357,116 @@
                 return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
             });
 
-            let primaryData = [];
-            let label = '';
+            let datasets = [];
             let unit = '';
-            let color = '#00628c';
-            let bgColor = 'rgba(0, 98, 140, 0.08)';
-
+            
             if (currentMetric === 'power') {
-                primaryData = data.map(item => item.power_kw || 0);
-                label = 'Active Power (kW)'; unit = 'kW';
+                unit = 'kW';
+                datasets.push({
+                    label: 'Active Power (kW)',
+                    data: data.map(item => item.power_kw || 0),
+                    yAxisID: 'y_power',
+                    fill: true,
+                    backgroundColor: 'rgba(0, 98, 140, 0.08)',
+                    borderColor: '#00628c',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
+                
+                // Add Voltage as secondary dataset
+                datasets.push({
+                    label: 'Voltage (V)',
+                    data: data.map(item => item.voltage || 0),
+                    yAxisID: 'y_voltage',
+                    fill: false,
+                    borderColor: 'orange',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.3
+                });
             } else if (currentMetric === 'voltage') {
-                primaryData = data.map(item => item.voltage || 0);
-                label = 'Voltage (V)'; unit = 'V';
-                color = '#f97316'; bgColor = 'rgba(249, 115, 22, 0.08)';
+                unit = 'V';
+                datasets.push({
+                    label: 'Voltage (V)',
+                    data: data.map(item => item.voltage || 0),
+                    yAxisID: 'y_power', // Re-use left axis for single view
+                    borderColor: '#f97316',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
             } else if (currentMetric === 'current') {
-                primaryData = data.map(item => item.current || 0);
-                label = 'Current (A)'; unit = 'A';
-                color = '#10b981'; bgColor = 'rgba(16, 185, 129, 0.08)';
+                unit = 'A';
+                datasets.push({
+                    label: 'Current (A)',
+                    data: data.map(item => item.current || 0),
+                    yAxisID: 'y_power',
+                    borderColor: '#10b981',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
             } else if (currentMetric === 'pf') {
-                primaryData = data.map(item => item.power_factor || 0);
-                label = 'PF'; unit = '';
-                color = '#8b5cf6'; bgColor = 'rgba(139, 92, 246, 0.08)';
+                unit = '';
+                datasets.push({
+                    label: 'PF',
+                    data: data.map(item => item.power_factor || 0),
+                    yAxisID: 'y_power',
+                    borderColor: '#8b5cf6',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
             }
 
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: primaryData,
-                        fill: true,
-                        backgroundColor: bgColor,
-                        borderColor: color,
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        tension: 0.3
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: { 
+                            display: (currentMetric === 'power'),
+                            position: 'top',
+                            align: 'end',
+                            labels: { boxWidth: 10, font: { size: 9, weight: 'bold' } }
+                        },
                         tooltip: {
                             mode: 'index', intersect: false, backgroundColor: 'rgba(15, 23, 42, 0.95)',
                             titleFont: { size: 10 }, bodyFont: { size: 11 },
-                            callbacks: { label: item => ` ${label}: ${item.parsed.y.toFixed(2)} ${unit}` }
+                            callbacks: { 
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2);
+                                    }
+                                    return label;
+                                }
+                            }
                         }
                     },
                     scales: {
-                        y: { 
+                        y_power: { 
+                            type: 'linear',
+                            position: 'left',
                             grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false }, 
-                            ticks: { font: { size: 9 }, callback: v => v.toFixed(1) + ' ' + unit } 
+                            ticks: { font: { size: 9 } },
+                            title: { display: true, text: (currentMetric === 'power' ? 'kW' : unit), font: { size: 9, weight: 'bold' } }
+                        },
+                        y_voltage: {
+                            type: 'linear',
+                            position: 'right',
+                            display: (currentMetric === 'power'),
+                            grid: { drawOnChartArea: false },
+                            ticks: { font: { size: 9 } },
+                            title: { display: true, text: 'V', font: { size: 9, weight: 'bold' } }
                         },
                         x: { 
                             grid: { display: false }, 
