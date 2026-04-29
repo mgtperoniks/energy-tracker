@@ -17,18 +17,23 @@ class EnergyChartService
         $start = Carbon::parse($startDate)->setTimezone(config('app.timezone'));
         $end = Carbon::parse($endDate)->setTimezone(config('app.timezone'));
         
-        $diffInHours = $start->diffInHours($end);
+        // Cap max range to 180 days for performance safety
+        if ($start->diffInDays($end) > 180) {
+            $start = $end->copy()->subDays(180);
+        }
+
         $diffInDays = $start->diffInDays($end);
 
-        // Tier 1: RAW (0 - 48 hours)
-        if ($diffInHours <= 48) {
+        // Smart Source Selection
+        // 1. RAW: <= 7 Days
+        if ($diffInDays <= 7) {
             return $this->queryRaw($deviceId, $start, $end);
         } 
-        // Tier 2: HOURLY (> 48 hours - 60 days)
-        elseif ($diffInDays <= 60) {
+        // 2. HOURLY: <= 30 Days
+        elseif ($diffInDays <= 30) {
             return $this->queryHourly($deviceId, $start, $end);
         } 
-        // Tier 3: DAILY (> 60 days)
+        // 3. DAILY: > 30 Days (max 180d)
         else {
             return $this->queryDaily($deviceId, $start, $end);
         }

@@ -53,6 +53,7 @@ class AdminController extends Controller
         ]);
 
         ElectricityTariff::create([
+            'name' => 'Tarif ' . \Carbon\Carbon::parse($validated['effective_date'])->format('d M Y'),
             'rate_per_kwh' => $validated['rate_per_kwh'],
             'effective_date' => $validated['effective_date'],
             'notes' => $validated['notes'],

@@ -95,6 +95,21 @@
                         <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="24">24H</button>
                         <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
                     </div>
+
+                    <!-- Forensic Mode UI -->
+                    <div class="flex items-center gap-1.5 border-l border-surface-container pl-2 ml-1" id="forensic-filter">
+                        <div class="flex flex-col">
+                            <span class="text-[6px] font-black uppercase text-outline">Start</span>
+                            <input type="datetime-local" id="forensic-start" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none">
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[6px] font-black uppercase text-outline">End</span>
+                            <input type="datetime-local" id="forensic-end" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none">
+                        </div>
+                        <button id="btn-forensic-generate" class="bg-primary text-white text-[8px] font-black px-2 py-1.5 rounded self-end hover:brightness-110 transition-all uppercase tracking-tighter">
+                            Gen
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="h-[220px] w-full">
@@ -289,7 +304,6 @@
 </div>
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
@@ -306,6 +320,9 @@
         // UI bindings
         const metricSelect = document.getElementById('chart-metric-toggle');
         const rangeButtons = document.querySelectorAll('#chart-range-selector button');
+        const forensicBtn = document.getElementById('btn-forensic-generate');
+        const forensicStart = document.getElementById('forensic-start');
+        const forensicEnd = document.getElementById('forensic-end');
 
         metricSelect.addEventListener('change', function(e) {
             currentMetric = e.target.value;
@@ -322,13 +339,55 @@
                 this.classList.remove('text-on-surface-variant');
                 
                 currentHours = parseInt(this.dataset.range);
+                // Reset forensic inputs when using quick range
+                forensicStart.value = '';
+                forensicEnd.value = '';
                 fetchAndRender();
             });
         });
 
-        function fetchAndRender() {
-            const end = new Date();
-            const start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+        forensicBtn.addEventListener('click', function() {
+            if (!forensicStart.value || !forensicEnd.value) {
+                alert('Please select both start and end datetime.');
+                return;
+            }
+
+            const start = new Date(forensicStart.value);
+            const end = new Date(forensicEnd.value);
+
+            if (end <= start) {
+                alert('End datetime must be after start datetime.');
+                return;
+            }
+
+            const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+            if (diffDays > 180) {
+                alert('Maximum range is 180 days.');
+                return;
+            }
+
+            // Remove active state from quick range buttons
+            rangeButtons.forEach(b => {
+                b.classList.remove('bg-white', 'text-primary', 'shadow-sm');
+                b.classList.add('text-on-surface-variant');
+            });
+
+            // Set currentHours for label formatting logic
+            currentHours = diffDays * 24;
+            
+            fetchAndRender(start, end);
+        });
+
+        function fetchAndRender(customStart = null, customEnd = null) {
+            let start, end;
+            
+            if (customStart && customEnd) {
+                start = customStart;
+                end = customEnd;
+            } else {
+                end = new Date();
+                start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+            }
 
             fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(res => res.json())
@@ -456,28 +515,6 @@
                                         label += context.parsed.y.toFixed(2);
                                     }
                                     return label;
-                                }
-                            }
-                        },
-                        annotation: {
-                            annotations: {
-                                thresholdLine: {
-                                    type: 'line',
-                                    yScaleID: (currentMetric === 'power' ? 'y_voltage' : 'y_power'),
-                                    yMin: 380,
-                                    yMax: 380,
-                                    borderColor: 'rgba(255, 0, 0, 0.8)',
-                                    borderWidth: 2,
-                                    display: (currentMetric === 'power' || currentMetric === 'voltage')
-                                },
-                                dangerZone: {
-                                    type: 'box',
-                                    yScaleID: (currentMetric === 'power' ? 'y_voltage' : 'y_power'),
-                                    yMin: 0,
-                                    yMax: 380,
-                                    backgroundColor: 'rgba(255, 0, 0, 0.03)',
-                                    borderWidth: 0,
-                                    display: (currentMetric === 'power' || currentMetric === 'voltage')
                                 }
                             }
                         }

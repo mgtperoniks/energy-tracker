@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('electricity_tariffs', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('name')->nullable();
             $table->decimal('rate_per_kwh', 10, 2);
             $table->date('effective_date');
             $table->boolean('is_active')->default(true);
