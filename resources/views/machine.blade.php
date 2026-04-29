@@ -350,6 +350,10 @@
                 return;
             }
 
+            const voltageData = data.map(item => item.voltage || 0);
+            const minVoltage = voltageData.length > 0 ? Math.min(...voltageData.filter(v => v > 0)) : 0;
+            const voltageAxisMin = (minVoltage >= 380) ? 380 : 0;
+
             const labels = data.map(item => {
                 const d = new Date(item.timestamp);
                 if (currentHours > 24) {
@@ -423,10 +427,6 @@
                     tension: 0.3
                 });
             }
-
-            const voltageData = data.map(item => item.voltage || 0);
-            const minVoltage = voltageData.length > 0 ? Math.min(...voltageData.filter(v => v > 0)) : 0;
-            const voltageAxisMin = (minVoltage >= 380) ? 380 : 0;
 
             chartInstance = new Chart(ctx, {
                 type: 'line',
