@@ -385,9 +385,10 @@
                     data: voltageData,
                     yAxisID: 'y_voltage',
                     fill: false,
-                    borderColor: '#ff6b00',
+                    borderColor: 'rgba(255,140,0,0.75)',
                     backgroundColor: 'transparent',
-                    borderWidth: 4,
+                    borderWidth: 2,
+                    borderDash: [3, 3],
                     pointRadius: 0,
                     pointHoverRadius: 5,
                     tension: 0.25
@@ -398,8 +399,9 @@
                     label: 'Voltage (V)',
                     data: voltageData,
                     yAxisID: 'y_power', // Re-use left axis for single view
-                    borderColor: '#ff6b00',
-                    borderWidth: 4,
+                    borderColor: 'rgba(255,140,0,0.75)',
+                    borderWidth: 2,
+                    borderDash: [3, 3],
                     pointRadius: 0,
                     pointHoverRadius: 5,
                     tension: 0.25
@@ -466,21 +468,14 @@
                                     yMax: 380,
                                     borderColor: 'rgba(255, 0, 0, 0.8)',
                                     borderWidth: 2,
-                                    display: (currentMetric === 'power' || currentMetric === 'voltage'),
-                                    label: {
-                                        display: true,
-                                        content: 'LOW VOLTAGE LIMIT',
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.8)',
-                                        font: { size: 8, weight: 'bold' }
-                                    }
+                                    display: (currentMetric === 'power' || currentMetric === 'voltage')
                                 },
                                 dangerZone: {
                                     type: 'box',
                                     yScaleID: (currentMetric === 'power' ? 'y_voltage' : 'y_power'),
                                     yMin: 0,
                                     yMax: 380,
-                                    backgroundColor: 'rgba(255, 0, 0, 0.08)',
+                                    backgroundColor: 'rgba(255, 0, 0, 0.03)',
                                     borderWidth: 0,
                                     display: (currentMetric === 'power' || currentMetric === 'voltage')
                                 }
