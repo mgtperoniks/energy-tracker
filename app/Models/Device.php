@@ -11,14 +11,36 @@ class Device extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'is_online' => 'boolean',
+        'last_seen_at' => 'datetime',
+        'last_kwh_total' => 'decimal:3',
+        'active_baseline_kwh' => 'decimal:3',
+    ];
+
     public function machine()
     {
         return $this->belongsTo(Machine::class);
     }
 
-    public function powerReadings()
+    public function powerReadingsRaw()
     {
-        return $this->hasMany(PowerReading::class);
+        return $this->hasMany(PowerReadingRaw::class);
+    }
+
+    public function powerReadingsHourly()
+    {
+        return $this->hasMany(PowerReadingHourly::class);
+    }
+
+    public function powerReadingsDaily()
+    {
+        return $this->hasMany(PowerReadingDaily::class);
+    }
+
+    public function pollerLogs()
+    {
+        return $this->hasMany(PollerLog::class);
     }
 
     public function environmentalReadings()

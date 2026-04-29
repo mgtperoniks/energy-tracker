@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MachineDashboardController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -9,107 +11,52 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/', function () {
-        \Illuminate\Support\Facades\DB::statement("SET time_zone = '+07:00'");
-        $todayKwh = \App\Models\DailyEnergySummary::where('date', today()->toDateString())->sum('kwh_usage');
-        $monthKwh = \App\Models\DailyEnergySummary::whereYear('date', today()->year)
-                        ->whereMonth('date', today()->month)
-                        ->sum('kwh_usage');
-        
-        // Sum of the most recent power_kw for each device
-        $latestReadings = \App\Models\PowerReading::whereIn('id', function($query) {
-            $query->selectRaw('max(id)')->from('power_readings')->groupBy('device_id');
-        })->get();
-        
-        $currentKw = $latestReadings->sum('power_kw');
+    // 1. OVERVIEW
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Detailed machine list for the dashboard table
-        $machines = \App\Models\Machine::with(['latestReading', 'todaySummary'])->get();
+    // 2. MONITORING
+    Route::prefix('monitoring')->name('monitoring.')->group(function () {
+        Route::get('/meters/{id?}', [\App\Http\Controllers\MachineDashboardController::class, 'show'])->name('meters');
+        Route::get('/environmental', [\App\Http\Controllers\EnvironmentalController::class, 'index'])->name('environmental');
+        Route::get('/system-health', [\App\Http\Controllers\SystemHealthController::class, 'index'])->name('health');
+    });
 
-        // Chart Data: Aggregate Power (kW) per hour for last 12 hours
-        $chartReadings = \App\Models\PowerReading::whereRaw('recorded_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)')
-            ->selectRaw('DATE_FORMAT(recorded_at, "%H:00") as hour, AVG(power_kw) as avg_kw')
-            ->groupBy('hour')
-            ->orderBy('hour')
-            ->get();
+    // 3. ANALYTICS
+    Route::prefix('analytics')->name('analytics.')->group(function () {
+        Route::get('/operational', [\App\Http\Controllers\ReportController::class, 'operational'])->name('operational');
+        Route::get('/accounting', [\App\Http\Controllers\ReportController::class, 'accounting'])->name('accounting');
+        Route::get('/audit', [\App\Http\Controllers\ReportController::class, 'audit'])->name('audit');
+    });
 
-        $chartLabels = $chartReadings->pluck('hour');
-        $chartValues = $chartReadings->pluck('avg_kw');
+    // 4. ASSETS
+    Route::prefix('assets')->name('assets.')->group(function () {
+        Route::get('/departments', [\App\Http\Controllers\AssetController::class, 'departments'])->name('departments');
+        Route::get('/machines', [\App\Http\Controllers\AssetController::class, 'machines'])->name('machines');
+        Route::get('/devices', [\App\Http\Controllers\AssetController::class, 'devices'])->name('devices');
+        Route::get('/sensors', [\App\Http\Controllers\AssetController::class, 'sensors'])->name('sensors');
+    });
 
-        return view('dashboard', compact('todayKwh', 'monthKwh', 'currentKw', 'machines', 'chartLabels', 'chartValues'));
-    })->name('dashboard');
+    // 5. ADMINISTRATION
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/tariffs', [\App\Http\Controllers\AdminController::class, 'tariffs'])->name('tariffs');
+        Route::post('/tariffs', [\App\Http\Controllers\AdminController::class, 'storeTariff'])->name('tariffs.store');
+        Route::get('/thresholds', [\App\Http\Controllers\AdminController::class, 'thresholds'])->name('thresholds');
+        Route::post('/thresholds', [\App\Http\Controllers\AdminController::class, 'updateThresholds'])->name('thresholds.update');
+        Route::get('/device-config', [\App\Http\Controllers\AdminController::class, 'deviceConfig'])->name('device-config');
+        Route::post('/device-config', [\App\Http\Controllers\AdminController::class, 'updateDeviceConfig'])->name('device-config.update');
+        Route::get('/poller-logs', [\App\Http\Controllers\AdminController::class, 'pollerLogs'])->name('poller-logs');
+        Route::get('/reset-history', [\App\Http\Controllers\AdminController::class, 'resetHistory'])->name('reset-history');
+        Route::get('/deployment-health', [\App\Http\Controllers\AdminController::class, 'deploymentHealth'])->name('deployment-health');
+    });
 
-    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
-
-    Route::get('/machines/{id?}', function ($id = null) {
-        \Illuminate\Support\Facades\DB::statement("SET time_zone = '+07:00'");
-        $machine = null;
-        if ($id) {
-            $machine = \App\Models\Machine::with([
-                'devices', 'latestReading', 'todaySummary', 'recentReadings', 'meterResets'
-            ])->find($id);
-        } else {
-            $machine = \App\Models\Machine::with([
-                'devices', 'latestReading', 'todaySummary', 'recentReadings', 'meterResets'
-            ])->first();
-        }
-
-        // Fetch Power History (kW & Voltage) for the past 12 hours for chart
-        $historyLabels    = [];
-        $historyValues    = [];
-        $historyVoltage   = [];
-        $todayConsumption = 0;
-        $totalEnergy      = 0;   // Lifetime cumulative kWh
-        $currentMeterKwh  = 0;   // Raw value on meter display right now
-
-        if ($machine) {
-            $deviceIds = $machine->devices->pluck('id');
-
-            $history = \App\Models\PowerReading::whereIn('device_id', $deviceIds)
-                        ->whereRaw('recorded_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)')
-                        ->orderBy('recorded_at', 'asc')
-                        ->get(['recorded_at', 'power_kw', 'kwh_total', 'voltage']);
-
-            foreach ($history as $point) {
-                $historyLabels[]  = $point->recorded_at->format('H:i');
-                $historyValues[]  = $point->power_kw;
-                $historyVoltage[] = $point->voltage;
-            }
-
-            // Drop chart to 0 if meter has been silent for >15 min
-            if ($history->isNotEmpty() && $history->last()->recorded_at->diffInMinutes(now()) > 15) {
-                $historyLabels[]  = now()->format('H:i');
-                $historyValues[]  = 0;
-                $historyVoltage[] = 0;
-            }
-
-            $todayConsumption = $machine->todaySummary?->kwh_usage ?? 0;
-
-            // Raw meter reading (what the physical device shows right now)
-            $currentMeterKwh = $machine->latestReading?->kwh_total ?? 0;
-
-            // TRUE lifetime total = baseline (all past periods) + current meter reading
-            $totalEnergy = $machine->lifetime_kwh;
-        }
-
-        return view('machine', compact(
-            'machine',
-            'historyLabels',
-            'historyValues',
-            'historyVoltage',
-            'todayConsumption',
-            'totalEnergy',      // Lifetime cumulative (what we show as "Total Energy")
-            'currentMeterKwh'   // Raw meter value (for reference / popup)
-        ));
-    })->name('machines');
-
-
-    Route::get('/environmental', function () {
-        return view('environmental');
-    })->name('environmental');
-
+    // API Routes
     Route::get('/api/machines/{id}/readings', [\App\Http\Controllers\Api\MachineController::class, 'readings'])->name('api.machines.readings');
+    Route::get('/api/charts/device', [\App\Http\Controllers\Api\ChartController::class, 'getDeviceChart'])->name('api.charts.device');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
+// Backward Compatibility Redirects
+Route::get('/machines/{id}', function ($id) {
+    return redirect()->route('monitoring.meters', ['id' => $id]);
+});

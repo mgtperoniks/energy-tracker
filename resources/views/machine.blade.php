@@ -2,517 +2,445 @@
 
 @section('content')
 <main class="md:ml-64 pt-16 pb-20 md:pb-8 min-h-screen bg-surface">
-    <div class="p-6 md:p-8 max-w-7xl mx-auto">
-        <!-- Header Section -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+    <div class="p-4 md:p-6 max-w-7xl mx-auto">
+        <!-- Header Section - Compact -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4">
             <div>
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="inline-block w-2 h-2 rounded-full bg-secondary"></span>
-                    <span class="text-label-sm uppercase tracking-widest text-outline font-bold text-[10px]">Operational Status: Normal</span>
+                <div class="flex items-center gap-2">
+                    @php
+                        $statusColor = match($opStatus) {
+                            'Offline' => 'bg-outline',
+                            'Low Voltage' => 'bg-error',
+                            'Idle' => 'bg-tertiary',
+                            'Mixed Load' => 'bg-primary',
+                            default => 'bg-secondary'
+                        };
+                    @endphp
+                    <span class="inline-block w-1.5 h-1.5 rounded-full {{ $statusColor }} @if($opStatus == 'Running') animate-pulse @endif"></span>
+                    <span class="text-[9px] uppercase tracking-widest text-outline font-bold">{{ $opStatus }}</span>
                 </div>
-                <h1 class="text-3xl font-extrabold tracking-tight text-on-surface">{{ $machine->name }}</h1>
-                <p class="text-on-surface-variant text-sm mt-1">Meter Code: {{ $machine->code }} | Device Connection: Modbus TCP/RS485</p>
+                <h1 class="text-xl font-black tracking-tight text-on-surface">{{ $machine->name }}</h1>
+                <p class="text-on-surface-variant text-[10px] mt-0.5">Code: {{ $machine->code }} | Modbus TCP/RS485</p>
             </div>
             <div class="flex gap-2">
-                <button class="px-4 py-2 bg-surface-container-high text-on-surface font-medium rounded-md hover:bg-surface-container-highest transition-colors flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                    Export Data
+                <button class="px-3 py-1.5 bg-surface-container-high text-on-surface text-[10px] font-bold rounded hover:bg-surface-container-highest transition-colors flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    Export
                 </button>
-                <button class="px-4 py-2 bg-gradient-to-r from-primary-container to-primary text-white font-medium rounded-md hover:brightness-110 transition-all flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm" data-icon="tune">tune</span>
-                    Adjust Parameters
+                <button class="px-3 py-1.5 bg-primary text-white text-[10px] font-bold rounded hover:brightness-110 transition-all flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">tune</span>
+                    Config
                 </button>
             </div>
         </div>
 
-        <!-- Metrics Bento Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <!-- Big Aggregate Metric -->
-            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm border-b-2 border-primary-container">
-                <div class="flex justify-between items-start mb-4">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-outline">Consumption (Today)</span>
-                    <span class="material-symbols-outlined text-primary" data-icon="electric_bolt">electric_bolt</span>
-                </div>
-                <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-black tracking-tight text-on-surface">{{ number_format($todayConsumption, 1) }}</span>
-                    <span class="text-xl font-bold text-outline">kWh</span>
-                </div>
-                <div class="mt-4 flex items-center gap-2 text-secondary text-sm font-bold">
-                    <span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
-                    @if($todayConsumption > 0)
-                        Estimated from avg power × time
-                    @else
-                        Waiting for data accumulation
-                    @endif
-                </div>
-            </div>
-
-            <!-- Total Energy Card -->
-            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm border-b-2 border-secondary-container">
-                <div class="flex justify-between items-start mb-4">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-outline">Total Energy (Lifetime)</span>
-                    <span class="material-symbols-outlined text-secondary" data-icon="history">history</span>
-                </div>
+        <!-- KPI Cards - Single Row Compact -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+            <!-- Cost -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b-2 border-tertiary-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Cost Today</span>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-2xl font-black tracking-tight text-on-surface">{{ number_format($totalEnergy, 2) }}</span>
-                    <span class="text-sm font-bold text-outline">kWh</span>
-                </div>
-                <div class="mt-3 space-y-1">
-                    <div class="flex items-center gap-1 text-[10px] font-bold text-outline">
-                        <span class="material-symbols-outlined text-xs">database</span>
-                        Baseline: {{ number_format($machine->kwh_baseline, 2) }} kWh
-                    </div>
-                    <div class="flex items-center gap-1 text-[10px] font-medium text-secondary">
-                        <span class="material-symbols-outlined text-xs">electric_meter</span>
-                        Meter now: {{ number_format($currentMeterKwh, 2) }} kWh
-                    </div>
+                    <span class="text-[10px] font-bold text-outline">Rp</span>
+                    <span class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($todayCost, 0) }}</span>
                 </div>
             </div>
-
-            <!-- Secondary Metrics -->
-            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Voltage</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->voltage ?? 0, 1) }} <span class="text-sm font-medium text-outline">V</span></div>
-                <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
-                    <div class="bg-primary h-full" style="width: {{ min(($machine->latestReading?->voltage ?? 0) / 400 * 100, 100) }}%"></div>
+            <!-- Consumption -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b-2 border-primary-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Today Usage</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($todayConsumption, 1) }}</span>
+                    <span class="text-[10px] font-bold text-outline">kWh</span>
                 </div>
             </div>
-            
-            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Current</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->current ?? 0, 1) }} <span class="text-sm font-medium text-outline">A</span></div>
-                <div class="w-full bg-surface-container-low h-1 mt-4 rounded-full overflow-hidden">
-                    <div class="bg-tertiary h-full" style="width: {{ min(($machine->latestReading?->current ?? 0) / 100 * 100, 100) }}%"></div>
+            <!-- Lifetime -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b-2 border-secondary-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Lifetime</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($totalEnergy, 1) }}</span>
+                    <span class="text-[10px] font-bold text-outline">kWh</span>
                 </div>
             </div>
-            
-            <div class="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-outline block mb-2">Power Factor</span>
-                <div class="text-3xl font-bold tracking-tight text-on-surface">{{ number_format($machine->latestReading?->power_factor ?? 0, 2) }}</div>
-                <div class="mt-4 flex items-center gap-1 @if(($machine->latestReading?->power_factor ?? 0) > 0.85) text-secondary @else text-rose-500 @endif text-[10px] font-bold">
-                    <span class="material-symbols-outlined text-xs">@if(($machine->latestReading?->power_factor ?? 0) > 0.85) check_circle @else warning @endif</span>
-                    {{ ($machine->latestReading?->power_factor ?? 0) > 0.85 ? 'OPTIMAL RANGE' : 'LOW PF DETECTED' }}
-                </div>
+            <!-- Voltage -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Voltage</span>
+                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->voltage ?? 0, 1) }} <span class="text-[10px] font-bold text-outline">V</span></div>
+            </div>
+            <!-- Current -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Current</span>
+                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->current ?? 0, 1) }} <span class="text-[10px] font-bold text-outline">A</span></div>
+            </div>
+            <!-- PF -->
+            <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Power Factor</span>
+                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->power_factor ?? 0, 2) }}</div>
             </div>
         </div>
 
-        <!-- Power History Chart Section -->
-        <div class="bg-surface-container-lowest p-8 rounded-lg shadow-sm mb-8 relative overflow-hidden">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-lg font-bold tracking-tight text-on-surface">Power History</h2>
-                    <p class="text-xs text-on-surface-variant">Active Load (kW) & Voltage (V) over last 12 hours</p>
-                </div>
-                <div class="flex gap-6">
-                    <div class="flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-sm" style="background:#00628c"></span>
-                        <span class="text-xs font-bold text-on-surface">Active Power (kW)</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-sm" style="background:#f97316"></span>
-                        <span class="text-xs font-bold text-on-surface">Voltage (V)</span>
+        <!-- Chart Section - Compact Height -->
+        <div class="bg-surface-container-lowest p-4 rounded border border-surface-container shadow-sm mb-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-on-surface">Power History</h3>
+                <div class="flex gap-2">
+                    <select id="chart-metric-toggle" class="bg-surface-container-low text-[9px] p-1 rounded font-bold text-on-surface-variant outline-none border-none">
+                        <option value="power">Active Power</option>
+                        <option value="voltage">Voltage</option>
+                        <option value="current">Current</option>
+                        <option value="pf">PF</option>
+                    </select>
+                    <div class="flex bg-surface-container-low p-0.5 rounded" id="chart-range-selector">
+                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="1">1H</button>
+                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="4">4H</button>
+                        <button class="px-2 py-0.5 text-[9px] font-bold rounded bg-white text-primary shadow-sm transition-colors" data-range="12">12H</button>
+                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="24">24H</button>
+                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
                     </div>
                 </div>
             </div>
-
-            <!-- Real Chart Canvas -->
-            <div class="h-[300px] w-full">
+            <div class="h-[220px] w-full">
                 <canvas id="powerChart"></canvas>
             </div>
         </div>
 
-        <script src="{{ asset('assets/js/chart.js') }}"></script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const ctx = document.getElementById('powerChart').getContext('2d');
-                
-                // Fetch data from PHP
-                const labels   = {!! json_encode($historyLabels) !!};
-                const values   = {!! json_encode($historyValues) !!};
-                const voltages = {!! json_encode($historyVoltage) !!};
+        <!-- Event Log Section - Full Width Compact -->
+        <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
+            <div class="px-4 py-2 border-b border-surface-container-low bg-surface-container-low/30 flex justify-between items-center">
+                <h2 class="text-[10px] font-black text-on-surface uppercase tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">warning</span>
+                    Anomaly & Event Log
+                </h2>
+                <span class="text-[9px] font-bold text-outline">Showing last 10 entries</span>
+            </div>
+            <div class="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+                @forelse($eventLogs as $log)
+                    <div class="border-l-2 @if($log->status == 'WARNING') border-tertiary @else border-error @endif pl-2 py-1 bg-surface-container-low/30 rounded-r">
+                        <p class="text-[8px] font-mono font-bold text-outline">{{ $log->event_at->format('H:i:s') }}</p>
+                        <p class="text-[9px] font-bold text-on-surface leading-tight truncate" title="{{ $log->message }}">{{ $log->message }}</p>
+                    </div>
+                @empty
+                    <div class="col-span-full py-2 text-center text-[10px] text-outline italic">No anomalous events recorded.</div>
+                @endforelse
+            </div>
+        </div>
 
-                const powerChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: 'Active Power (kW)',
-                                data: values,
-                                yAxisID: 'y',
-                                fill: true,
-                                backgroundColor: 'rgba(0, 98, 140, 0.08)',
-                                borderColor: '#00628c',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                pointHoverRadius: 5,
-                                tension: 0.3,
-                                segment: {
-                                    borderColor: ctx => {
-                                        if (ctx.p1.parsed.y > 40) return '#fb7185';
-                                        return undefined;
-                                    }
-                                }
-                            },
-                            {
-                                label: 'Voltage (V)',
-                                data: voltages,
-                                yAxisID: 'y1',
-                                fill: false,
-                                borderColor: '#f97316',
-                                backgroundColor: 'rgba(249, 115, 22, 0.08)',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                pointHoverRadius: 5,
-                                tension: 0.3,
-                                borderDash: [4, 3],
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false,
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                titleFont: { size: 10, weight: 'bold' },
-                                bodyFont: { size: 12 },
-                                padding: 12,
-                                cornerRadius: 8,
-                                callbacks: {
-                                    label: function(item) {
-                                        if (item.datasetIndex === 0) {
-                                            return ' Power: ' + item.parsed.y.toFixed(2) + ' kW';
-                                        }
-                                        return ' Voltage: ' + item.parsed.y.toFixed(1) + ' V';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                position: 'left',
-                                beginAtZero: false,
-                                grid: {
-                                    color: 'rgba(148, 163, 184, 0.1)',
-                                    drawBorder: false
-                                },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono', weight: 'bold' },
-                                    color: '#00628c',
-                                    callback: function(value) { return value.toFixed(1) + ' kW'; }
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                position: 'right',
-                                beginAtZero: false,
-                                grid: {
-                                    drawOnChartArea: false,
-                                },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono', weight: 'bold' },
-                                    color: '#f97316',
-                                    callback: function(value) { return value.toFixed(0) + ' V'; }
-                                }
-                            },
-                            x: {
-                                grid: {
-                                    display: false
-                                },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono', weight: 'bold' },
-                                    color: '#94a3b8',
-                                    maxRotation: 0,
-                                    autoSkip: true,
-                                    maxTicksLimit: 12
-                                }
-                            }
-                        },
-                        interaction: {
-                            intersect: false,
-                        }
-                    }
-                });
-            });
-        </script>
-
-
-        <!-- Recent Readings Log -->
-        <div class="bg-surface-container-lowest rounded-lg shadow-sm overflow-hidden">
-            <div class="px-8 py-4 border-b border-surface-container-low flex justify-between items-center">
-                <h2 class="text-sm font-bold tracking-tight text-on-surface uppercase">Recent Readings Log</h2>
-                <div class="text-[10px] text-outline font-medium">REAL-TIME UPDATE EVERY 5 SECONDS</div>
+        <!-- Raw Telemetry - Full Width Priority -->
+        <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
+            <div class="px-4 py-3 border-b border-surface-container-low flex justify-between items-center bg-surface-container-low/50">
+                <h2 class="text-[10px] font-black tracking-widest text-on-surface uppercase flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">stream</span>
+                    Telemetry Data Ledger (Live)
+                </h2>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                        <span class="text-[9px] font-bold text-outline">SYNCING</span>
+                    </div>
+                </div>
             </div>
             
             <div class="overflow-x-auto">
-                <table class="w-full text-left inline-table">
+                <table class="w-full text-left">
                     <thead>
-                        <tr class="bg-surface-container-low text-[10px] font-black text-on-surface-variant uppercase tracking-widest">
-                            <th class="px-8 py-3">Timestamp</th>
-                            <th class="px-4 py-3 text-right">Power (kW)</th>
-                            <th class="px-4 py-3 text-right">Voltage (V)</th>
-                            <th class="px-4 py-3 text-right">Current (A)</th>
-                            <th class="px-4 py-3 text-center">Status</th>
-                            <th class="px-8 py-3 text-right">Action</th>
+                        <tr class="bg-surface-container-low text-[9px] font-black text-on-surface-variant uppercase tracking-widest">
+                            <th class="px-4 py-2">Timestamp</th>
+                            <th class="px-4 py-2 text-right">Power (kW)</th>
+                            <th class="px-4 py-2 text-right">Volt (V)</th>
+                            <th class="px-4 py-2 text-right">Curr (A)</th>
+                            <th class="px-4 py-2 text-right">PF</th>
+                            <th class="px-4 py-2 text-right">Total (kWh)</th>
+                            <th class="px-4 py-2 text-center">Status</th>
+                            <th class="px-4 py-2 text-right">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="text-sm">
-                        @forelse($machine->recentReadings as $row)
-                        <tr class="border-b border-surface-container-low hover:bg-surface-container-low transition-colors">
-                            <td class="px-8 py-4 font-mono text-xs">{{ $row->recorded_at }}</td>
-                            <td class="px-4 py-4 text-right font-bold text-primary">{{ number_format($row->power_kw, 2) }}</td>
-                            <td class="px-4 py-4 text-right text-on-surface-variant">{{ number_format($row->voltage, 1) }}</td>
-                            <td class="px-4 py-4 text-right text-on-surface-variant">{{ number_format($row->current, 1) }}</td>
-                            <td class="px-4 py-4 text-center">
-                                @if($row->power_kw > 40)
-                                    <span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>
-                                @elseif($row->power_kw <= 0)
-                                    <span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>
-                                @else
-                                    <span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>
-                                @endif
-                            </td>
-                            <td class="px-8 py-4 text-right">
-                                <button class="text-primary hover:underline text-xs font-bold detail-btn" 
-                                    data-timestamp="{{ $row->recorded_at }}"
-                                    data-power="{{ number_format($row->power_kw, 2) }}"
-                                    data-voltage="{{ number_format($row->voltage, 1) }}"
-                                    data-current="{{ number_format($row->current, 1) }}"
-                                    data-pf="{{ number_format($row->power_factor ?? 1.0, 2) }}"
-                                    data-kwh="{{ number_format($row->kwh_total, 2) }}">
-                                    Details
-                                </button>
-                            </td>
-                        </tr>
-                        @empty
+                    <tbody class="text-[11px]">
                         <tr>
-                            <td colspan="6" class="px-8 py-10 text-center text-outline italic">No recent readings available for this machine.</td>
+                            <td colspan="8" class="px-4 py-10 text-center text-outline italic">Loading telemetry stream...</td>
                         </tr>
-                        @endforelse
                     </tbody>
                 </table>
             </div>
             
-            <div class="px-8 py-4 bg-surface-container-low flex flex-col md:flex-row justify-between items-center gap-4 border-t border-surface-container-low">
+            <div class="px-4 py-2 bg-surface-container-low flex justify-between items-center border-t border-surface-container-low">
                 <div class="flex items-center gap-2">
-                    <button id="prev-page" class="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                        <span class="material-symbols-outlined">chevron_left</span>
+                    <button id="prev-page" class="p-1 hover:bg-primary/10 rounded-full transition-colors disabled:opacity-20">
+                        <span class="material-symbols-outlined text-lg">chevron_left</span>
                     </button>
-                    <div class="text-[10px] font-black text-on-surface-variant uppercase tracking-widest whitespace-nowrap">
-                        Page <span id="current-page-display">1</span> of <span id="last-page-display">1</span>
+                    <span class="text-[9px] font-black text-outline uppercase tracking-widest">
+                        Page <span id="current-page-display">1</span> / <span id="last-page-display">1</span>
+                    </span>
+                    <button id="next-page" class="p-1 hover:bg-primary/10 rounded-full transition-colors disabled:opacity-20">
+                        <span class="material-symbols-outlined text-lg">chevron_right</span>
+                    </button>
+                </div>
+                <div class="text-[9px] text-outline font-black uppercase tracking-widest">
+                    Total: <span id="total-readings-display">0</span> Records
+                </div>
+            </div>
+        </div>
+
+        <!-- Meter Reset History - Collapsible Below -->
+        <details class="bg-surface-container-lowest rounded border border-surface-container shadow-sm group">
+            <summary class="px-4 py-3 cursor-pointer list-none flex justify-between items-center hover:bg-surface-container-low/30 transition-colors">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">history</span>
+                    <h2 class="text-[10px] font-black tracking-widest text-on-surface uppercase">Meter Reset History</h2>
+                </div>
+                <span class="material-symbols-outlined text-sm transform transition-transform group-open:rotate-180">expand_more</span>
+            </summary>
+            <div class="border-t border-surface-container-low">
+                <div class="px-4 py-3 flex justify-between items-center">
+                    <p class="text-[10px] text-outline">Log baseline adjustments for physical meter resets.</p>
+                    <button id="btn-log-reset"
+                        data-machine-id="{{ $machine->id }}"
+                        data-machine-name="{{ $machine->name }}"
+                        data-current-kwh="{{ number_format($currentMeterKwh, 2) }}"
+                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black rounded uppercase tracking-widest transition-colors flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-sm">restart_alt</span>
+                        Log New Reset
+                    </button>
+                </div>
+                @if($machine->meterResets->isEmpty())
+                    <div class="px-4 py-4 text-center text-outline italic text-[10px]">No reset history found.</div>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-[10px]">
+                            <thead>
+                                <tr class="bg-surface-container-low font-black text-on-surface-variant uppercase tracking-tighter">
+                                    <th class="px-4 py-2">Date</th>
+                                    <th class="px-4 py-2 text-right">kWh at Reset</th>
+                                    <th class="px-4 py-2">Notes</th>
+                                    <th class="px-4 py-2">By</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-surface-container-low">
+                                @foreach($machine->meterResets as $reset)
+                                <tr>
+                                    <td class="px-4 py-2 font-mono">{{ $reset->reset_at->format('d M y H:i') }}</td>
+                                    <td class="px-4 py-2 text-right font-bold text-secondary">{{ number_format($reset->kwh_at_reset, 2) }}</td>
+                                    <td class="px-4 py-2 text-on-surface-variant truncate max-w-[150px]">{{ $reset->notes ?? '-' }}</td>
+                                    <td class="px-4 py-2">{{ $reset->performedBy?->name ?? 'System' }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                    <button id="next-page" class="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                        <span class="material-symbols-outlined">chevron_right</span>
-                    </button>
-                </div>
-                
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] font-bold text-outline uppercase">Go to page:</span>
-                    <input type="number" id="jump-page-input" min="1" class="w-16 px-2 py-1 bg-white border border-outline-variant rounded text-xs font-mono font-bold text-center" placeholder="...">
-                    <button id="jump-page-btn" class="px-3 py-1 bg-primary text-white text-[10px] font-black rounded uppercase tracking-widest hover:brightness-110 transition-all">Go</button>
-                </div>
-                
-                <div class="text-[10px] text-outline font-medium uppercase tracking-tighter">
-                    Total: <span id="total-readings-display">0</span> records
+                @endif
+                <div class="px-4 py-2 bg-surface-container-low/50">
+                    <p class="text-[9px] text-outline font-bold">
+                        Calculated Baseline: {{ number_format($machine->kwh_baseline, 2) }} kWh | Current Raw: {{ number_format($currentMeterKwh, 2) }} kWh
+                    </p>
                 </div>
             </div>
-        </div>
-    </div>
-
-    {{-- ====================================================
-         METER RESET HISTORY PANEL
-         Shows all logged reset events with a button to log a new one.
-    ====================================================== --}}
-    <div class="p-6 md:p-8 max-w-7xl mx-auto">
-        <div class="bg-surface-container-lowest rounded-lg shadow-sm overflow-hidden">
-            <div class="px-8 py-4 border-b border-surface-container-low flex justify-between items-center">
-                <div>
-                    <h2 class="text-sm font-bold tracking-tight text-on-surface uppercase">Meter Reset History</h2>
-                    <p class="text-[10px] text-outline mt-0.5">Riwayat reset counter energy meter fisik</p>
-                </div>
-                {{-- Button to log a manual reset (disabled until 1 May or as needed) --}}
-                <button id="btn-log-reset"
-                    data-machine-id="{{ $machine->id }}"
-                    data-machine-name="{{ $machine->name }}"
-                    data-current-kwh="{{ number_format($currentMeterKwh, 2) }}"
-                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-md transition-colors flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">restart_alt</span>
-                    Log Reset Meter
-                </button>
-            </div>
-
-            @if($machine->meterResets->isEmpty())
-                <div class="px-8 py-6 text-center text-outline italic text-sm">
-                    Belum ada reset meter tercatat. Total Energy = Baseline + Meter saat ini.
-                </div>
-            @else
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="bg-surface-container-low text-[10px] font-black text-on-surface-variant uppercase tracking-widest">
-                                <th class="px-8 py-3">Reset At</th>
-                                <th class="px-4 py-3 text-right">kWh at Reset</th>
-                                <th class="px-4 py-3">Notes</th>
-                                <th class="px-4 py-3">By</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($machine->meterResets as $reset)
-                            <tr class="border-b border-surface-container-low text-sm">
-                                <td class="px-8 py-3 font-mono text-xs">{{ $reset->reset_at->format('d M Y H:i') }}</td>
-                                <td class="px-4 py-3 text-right font-bold text-secondary">{{ number_format($reset->kwh_at_reset, 2) }} kWh</td>
-                                <td class="px-4 py-3 text-on-surface-variant text-xs">{{ $reset->notes ?? '-' }}</td>
-                                <td class="px-4 py-3 text-xs">{{ $reset->performedBy?->name ?? 'System' }}</td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-
-            <div class="px-8 py-3 bg-surface-container-low">
-                <p class="text-[10px] text-outline">
-                    <strong>Total Lifetime kWh</strong> =
-                    Baseline <strong>{{ number_format($machine->kwh_baseline, 2) }} kWh</strong>
-                    + Meter sekarang <strong>{{ number_format($currentMeterKwh, 2) }} kWh</strong>
-                    = <strong class="text-primary">{{ number_format($totalEnergy, 2) }} kWh</strong>
-                </p>
-            </div>
-        </div>
+        </details>
     </div>
 </main>
 
 <!-- Details Modal -->
-<div id="details-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all animate-in fade-in duration-300 pointer-events-none">
-    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transform transition-all scale-95 opacity-0 duration-300 pointer-events-auto" id="modal-content">
-        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">Reading Details</h3>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+<div id="details-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all animate-in fade-in duration-300 pointer-events-none">
+    <div class="bg-white w-full max-w-sm rounded shadow-2xl border border-surface-container overflow-hidden transform transition-all scale-95 opacity-0 duration-300 pointer-events-auto" id="modal-content">
+        <div class="px-4 py-3 bg-surface-container-low/50 border-b border-surface-container flex justify-between items-center">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-outline">Telemetry Details</h3>
+            <button onclick="closeModal()" class="text-outline hover:text-on-surface transition-colors">
                 <span class="material-symbols-outlined text-sm">close</span>
             </button>
         </div>
-        <div class="p-6 space-y-6">
-            <div class="flex justify-between items-end border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div class="p-4 space-y-4">
+            <div class="flex justify-between items-end border-b border-surface-container-low pb-3">
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase">Timestamp</span>
-                    <div id="modal-timestamp" class="text-sm font-mono font-bold text-slate-700 dark:text-slate-300"></div>
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest">Timestamp</span>
+                    <div id="modal-timestamp" class="text-xs font-mono font-black text-on-surface"></div>
                 </div>
-                <div class="text-right">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase">Status</span>
-                    <div id="modal-status" class="mt-1"></div>
-                </div>
+                <div id="modal-status" class="text-right"></div>
             </div>
             
-            <div class="grid grid-cols-2 gap-6">
+            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Active Power</span>
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Active Power</span>
                     <div class="flex items-baseline gap-1">
-                        <span id="modal-power" class="text-2xl font-black text-primary tracking-tight"></span>
-                        <span class="text-xs font-bold text-slate-400">kW</span>
+                        <span id="modal-power" class="text-xl font-black text-primary tracking-tighter"></span>
+                        <span class="text-[9px] font-bold text-outline">kW</span>
                     </div>
                 </div>
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Total Energy</span>
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Total Energy</span>
                     <div class="flex items-baseline gap-1">
-                        <span id="modal-kwh" class="text-2xl font-black text-on-surface tracking-tight"></span>
-                        <span class="text-xs font-bold text-slate-400">kWh</span>
+                        <span id="modal-kwh" class="text-xl font-black text-on-surface tracking-tighter"></span>
+                        <span class="text-[9px] font-bold text-outline">kWh</span>
                     </div>
                 </div>
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Voltage</span>
-                    <div class="flex items-baseline gap-1 text-slate-700">
-                        <span id="modal-voltage" class="text-xl font-bold tracking-tight"></span>
-                        <span class="text-xs font-bold text-slate-400">V</span>
-                    </div>
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Voltage</span>
+                    <div class="text-lg font-bold tracking-tighter text-on-surface"><span id="modal-voltage"></span> <span class="text-[9px] font-bold text-outline">V</span></div>
                 </div>
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Current</span>
-                    <div class="flex items-baseline gap-1 text-slate-700">
-                        <span id="modal-current" class="text-xl font-bold tracking-tight"></span>
-                        <span class="text-xs font-bold text-slate-400">A</span>
-                    </div>
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Current</span>
+                    <div class="text-lg font-bold tracking-tighter text-on-surface"><span id="modal-current"></span> <span class="text-[9px] font-bold text-outline">A</span></div>
                 </div>
-                <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Power Factor</span>
-                    <div id="modal-pf" class="text-xl font-bold text-slate-700"></div>
+                <div class="col-span-2">
+                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Power Factor</span>
+                    <div id="modal-pf" class="text-lg font-black text-on-surface"></div>
                 </div>
             </div>
         </div>
-        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
-            <button onclick="closeModal()" class="w-full py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Close</button>
+        <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container">
+            <button onclick="closeModal()" class="w-full py-2 bg-primary text-white font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">OK</button>
         </div>
     </div>
 </div>
 
+<script src="{{ asset('assets/js/chart.js') }}"></script>
 <script>
-    function openModal(data) {
-        document.getElementById('modal-timestamp').innerText = data.timestamp;
-        document.getElementById('modal-power').innerText = data.power;
-        document.getElementById('modal-voltage').innerText = data.voltage;
-        document.getElementById('modal-current').innerText = data.current;
-        document.getElementById('modal-pf').innerText = data.pf;
-        document.getElementById('modal-kwh').innerText = data.kwh;
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('powerChart').getContext('2d');
+        let chartInstance = null;
+        let currentHours = 12;
+        let currentMetric = 'power';
         
-        const statusEl = document.getElementById('modal-status');
-        if (parseFloat(data.power) > 40) {
-            statusEl.innerHTML = '<span class="bg-rose-100 text-rose-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Spike</span>';
-        } else if (parseFloat(data.power) <= 0) {
-            statusEl.innerHTML = '<span class="bg-slate-100 text-slate-500 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Mati</span>';
-        } else {
-            statusEl.innerHTML = '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight">Optimal</span>';
+        const deviceId = {{ $machine->devices->first()?->id ?? 'null' }};
+        if (!deviceId) {
+            renderEmptyChart();
+            return;
         }
 
-        const modal = document.getElementById('details-modal');
-        const content = document.getElementById('modal-content');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => {
-            modal.classList.remove('pointer-events-none');
-            content.classList.remove('scale-95', 'opacity-0');
-        }, 10);
-    }
+        // UI bindings
+        const metricSelect = document.getElementById('chart-metric-toggle');
+        const rangeButtons = document.querySelectorAll('#chart-range-selector button');
 
-    function closeModal() {
-        const modal = document.getElementById('details-modal');
-        const content = document.getElementById('modal-content');
-        content.classList.add('scale-95', 'opacity-0');
-        modal.classList.add('pointer-events-none');
-        setTimeout(() => {
-            modal.classList.remove('flex');
-            modal.classList.add('hidden');
-        }, 300);
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Event delegation for Details buttons
-        document.body.addEventListener('click', function(e) {
-            if (e.target.classList.contains('detail-btn')) {
-                const data = e.target.dataset;
-                openModal(data);
-            }
+        metricSelect.addEventListener('change', function(e) {
+            currentMetric = e.target.value;
+            fetchAndRender();
         });
 
+        rangeButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                rangeButtons.forEach(b => {
+                    b.classList.remove('bg-white', 'text-primary', 'shadow-sm');
+                    b.classList.add('text-on-surface-variant');
+                });
+                this.classList.add('bg-white', 'text-primary', 'shadow-sm');
+                this.classList.remove('text-on-surface-variant');
+                
+                currentHours = parseInt(this.dataset.range);
+                fetchAndRender();
+            });
+        });
+
+        function fetchAndRender() {
+            const end = new Date();
+            const start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+
+            fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+                .then(res => res.json())
+                .then(response => {
+                    const data = response.data || [];
+                    renderChart(data);
+                })
+                .catch(err => {
+                    console.error('Error fetching chart data:', err);
+                    renderEmptyChart();
+                });
+        }
+
+        function renderChart(data) {
+            if (chartInstance) chartInstance.destroy();
+            
+            if (data.length === 0) {
+                renderEmptyChart();
+                return;
+            }
+
+            const labels = data.map(item => {
+                const d = new Date(item.timestamp);
+                if (currentHours > 24) {
+                    return d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0');
+                }
+                return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            });
+
+            let primaryData = [];
+            let label = '';
+            let unit = '';
+            let color = '#00628c';
+            let bgColor = 'rgba(0, 98, 140, 0.08)';
+
+            if (currentMetric === 'power') {
+                primaryData = data.map(item => item.power_kw || 0);
+                label = 'Active Power (kW)'; unit = 'kW';
+            } else if (currentMetric === 'voltage') {
+                primaryData = data.map(item => item.voltage || 0);
+                label = 'Voltage (V)'; unit = 'V';
+                color = '#f97316'; bgColor = 'rgba(249, 115, 22, 0.08)';
+            } else if (currentMetric === 'current') {
+                primaryData = data.map(item => item.current || 0);
+                label = 'Current (A)'; unit = 'A';
+                color = '#10b981'; bgColor = 'rgba(16, 185, 129, 0.08)';
+            } else if (currentMetric === 'pf') {
+                primaryData = data.map(item => item.power_factor || 0);
+                label = 'PF'; unit = '';
+                color = '#8b5cf6'; bgColor = 'rgba(139, 92, 246, 0.08)';
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: primaryData,
+                        fill: true,
+                        backgroundColor: bgColor,
+                        borderColor: color,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index', intersect: false, backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleFont: { size: 10 }, bodyFont: { size: 11 },
+                            callbacks: { label: item => ` ${label}: ${item.parsed.y.toFixed(2)} ${unit}` }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false }, 
+                            ticks: { font: { size: 9 }, callback: v => v.toFixed(1) + ' ' + unit } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } 
+                        }
+                    },
+                    interaction: { intersect: false }
+                }
+            });
+        }
+
+        function renderEmptyChart() {
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, { type: 'line', data: { labels: ['No Data'], datasets: [] }, options: { maintainAspectRatio: false } });
+        }
+
+        fetchAndRender();
+
+        // Telemetry Logic
         let currentPage = 1;
         let lastPage = 1;
         const machineId = "{{ $machine->id }}";
         
-        // Helper to format timestamp
         function formatTimestamp(isoString) {
             const d = new Date(isoString);
-            const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-            const yyyy = wib.getUTCFullYear();
-            const mm   = String(wib.getUTCMonth() + 1).padStart(2, '0');
-            const dd   = String(wib.getUTCDate()).padStart(2, '0');
-            const hh   = String(wib.getUTCHours()).padStart(2, '0');
-            const min  = String(wib.getUTCMinutes()).padStart(2, '0');
-            const ss   = String(wib.getUTCSeconds()).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            const mm   = String(d.getMonth() + 1).padStart(2, '0');
+            const dd   = String(d.getDate()).padStart(2, '0');
+            const hh   = String(d.getHours()).padStart(2, '0');
+            const min  = String(d.getMinutes()).padStart(2, '0');
+            const ss   = String(d.getSeconds()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
         }
 
@@ -531,155 +459,116 @@
                 if (result.status === 'success') {
                     const paginator = result.data;
                     const readings = paginator.data;
-                    
-                    // Clear current table
                     tbody.innerHTML = '';
                     
                     if (readings.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="px-8 py-10 text-center text-outline italic">No data found for this page.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-outline italic">No telemetry data.</td></tr>';
                     }
 
                     readings.forEach(row => {
                         const tr = document.createElement('tr');
                         tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
-
-                        const power     = parseFloat(row.power_kw);
+                        const power = parseFloat(row.power_kw);
                         const timestamp = formatTimestamp(row.recorded_at);
                         const statusHtml = power > 40
-                            ? '<span class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full text-[10px] font-bold uppercase">Spike</span>'
+                            ? '<span class="bg-error-container text-error px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Spike</span>'
                             : (power <= 0
-                                ? '<span class="bg-outline/20 text-outline px-2 py-1 rounded-full text-[10px] font-bold uppercase">Mati</span>'
-                                : '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase">Optimal</span>');
+                                ? '<span class="bg-surface-container-highest text-outline px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Offline</span>'
+                                : '<span class="bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Optimal</span>');
 
                         tr.innerHTML = `
-                            <td class="px-8 py-4 font-mono text-xs">${timestamp}</td>
-                            <td class="px-4 py-4 text-right font-bold text-primary">${power.toFixed(2)}</td>
-                            <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
-                            <td class="px-4 py-4 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
-                            <td class="px-4 py-4 text-center">${statusHtml}</td>
-                            <td class="px-8 py-4 text-right">
-                                <button class="text-primary hover:underline text-xs font-bold detail-btn"
+                            <td class="px-4 py-2 font-mono text-[10px] text-outline">${timestamp}</td>
+                            <td class="px-4 py-2 text-right font-black text-primary">${power.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.power_factor || 1.0).toFixed(2)}</td>
+                            <td class="px-4 py-2 text-right font-bold text-on-surface">${parseFloat(row.kwh_total).toFixed(2)}</td>
+                            <td class="px-4 py-2 text-center">${statusHtml}</td>
+                            <td class="px-4 py-2 text-right">
+                                <button class="text-primary hover:underline text-[9px] font-black uppercase detail-btn"
                                     data-timestamp="${timestamp}"
                                     data-power="${power.toFixed(2)}"
                                     data-voltage="${parseFloat(row.voltage).toFixed(1)}"
                                     data-current="${parseFloat(row.current).toFixed(1)}"
                                     data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
                                     data-kwh="${parseFloat(row.kwh_total).toFixed(2)}">
-                                    Details
+                                    Detail
                                 </button>
                             </td>
                         `;
                         tbody.appendChild(tr);
                     });
 
-                    // Update UI controls
                     currentPage = paginator.current_page;
                     lastPage = paginator.last_page;
-                    
                     pageDisplay.innerText = currentPage;
                     lastPageDisplay.innerText = lastPage;
                     totalDisplay.innerText = paginator.total;
-                    
                     prevBtn.disabled = currentPage <= 1;
                     nextBtn.disabled = currentPage >= lastPage;
-                    
-                    // Scroll to top of table if needed
-                    // tbody.closest('.overflow-x-auto').scrollTop = 0;
                 }
-            } catch (error) {
-                console.error('Error fetching readings:', error);
-            }
+            } catch (error) { console.error('Error fetching readings:', error); }
         }
 
-        // Event listeners for pagination
-        document.getElementById('next-page').addEventListener('click', () => {
-            if (currentPage < lastPage) fetchReadings(currentPage + 1);
-        });
-
-        document.getElementById('prev-page').addEventListener('click', () => {
-            if (currentPage > 1) fetchReadings(currentPage - 1);
-        });
-
-        document.getElementById('jump-page-btn').addEventListener('click', () => {
-            const val = parseInt(document.getElementById('jump-page-input').value);
-            if (val >= 1 && val <= lastPage) {
-                fetchReadings(val);
-            } else {
-                alert(`Please enter a page between 1 and ${lastPage}`);
-            }
-        });
-
-        // Initial fetch only if user clicks or on load? 
-        // Let's stick with initial Blade data for page 1, but we need total count
-        // For simplicity, let's just trigger a fetch on load to initialize the paginator
+        document.getElementById('next-page').addEventListener('click', () => { if (currentPage < lastPage) fetchReadings(currentPage + 1); });
+        document.getElementById('prev-page').addEventListener('click', () => { if (currentPage > 1) fetchReadings(currentPage - 1); });
         fetchReadings(1);
-    });
 
-    // Close modal on background click
-    document.getElementById('details-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
-    });
+        // Modal Logic
+        window.openModal = function(data) {
+            document.getElementById('modal-timestamp').innerText = data.timestamp;
+            document.getElementById('modal-power').innerText = data.power;
+            document.getElementById('modal-voltage').innerText = data.voltage;
+            document.getElementById('modal-current').innerText = data.current;
+            document.getElementById('modal-pf').innerText = data.pf;
+            document.getElementById('modal-kwh').innerText = data.kwh;
+            
+            const statusEl = document.getElementById('modal-status');
+            const power = parseFloat(data.power);
+            if (power > 40) statusEl.innerHTML = '<span class="bg-error-container text-error px-2 py-1 rounded text-[8px] font-black uppercase">Spike</span>';
+            else if (power <= 0) statusEl.innerHTML = '<span class="bg-surface-container-highest text-outline px-2 py-1 rounded text-[8px] font-black uppercase">Offline</span>';
+            else statusEl.innerHTML = '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded text-[8px] font-black uppercase">Optimal</span>';
 
-    // --- LOG RESET METER BUTTON ---
-    const btnLogReset = document.getElementById('btn-log-reset');
-    if (btnLogReset) {
-        btnLogReset.addEventListener('click', async function () {
-            const machineId   = this.dataset.machineId;
-            const machineName = this.dataset.machineName;
-            const currentKwh  = this.dataset.currentKwh;
+            const modal = document.getElementById('details-modal');
+            const content = document.getElementById('modal-content');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => { modal.classList.remove('pointer-events-none'); content.classList.remove('scale-95', 'opacity-0'); }, 10);
+        };
 
-            const confirmed = confirm(
-                `⚠️ LOG RESET METER\n\n` +
-                `Mesin     : ${machineName}\n` +
-                `kWh sekarang: ${currentKwh} kWh\n\n` +
-                `Nilai ${currentKwh} kWh akan ditambahkan ke baseline.\n` +
-                `Lakukan ini SEBELUM reset fisik di meter.\n\n` +
-                `Lanjutkan?`
-            );
+        window.closeModal = function() {
+            const modal = document.getElementById('details-modal');
+            const content = document.getElementById('modal-content');
+            content.classList.add('scale-95', 'opacity-0');
+            modal.classList.add('pointer-events-none');
+            setTimeout(() => { modal.classList.remove('flex'); modal.classList.add('hidden'); }, 300);
+        };
 
-            if (!confirmed) return;
-
-            const notes = prompt(
-                'Masukkan catatan reset (opsional):',
-                'Reset tahunan - ' + new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-            );
-
-            this.disabled = true;
-            this.innerText = 'SAVING...';
-
-            try {
-                const response = await fetch(`/api/machines/${machineId}/reset`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    },
-                    body: JSON.stringify({ notes: notes || '' })
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.status === 'success') {
-                    alert(
-                        `✅ Reset berhasil dicatat!\n\n` +
-                        `kWh at reset : ${result.data.kwh_at_reset} kWh\n` +
-                        `Baseline baru: ${result.data.new_baseline} kWh\n\n` +
-                        `Sekarang Anda bisa reset counter fisik di power meter.\n` +
-                        `Halaman akan di-refresh.`
-                    );
-                    window.location.reload();
-                } else {
-                    alert('❌ Gagal mencatat reset: ' + (result.message || 'Unknown error'));
-                    this.disabled = false;
-                    this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log Reset Meter';
-                }
-            } catch (err) {
-                alert('❌ Error: ' + err.message);
-                this.disabled = false;
-                this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log Reset Meter';
-            }
+        document.body.addEventListener('click', function(e) {
+            if (e.target.classList.contains('detail-btn')) { openModal(e.target.dataset); }
         });
-    }
+
+        // Reset Logic
+        const btnLogReset = document.getElementById('btn-log-reset');
+        if (btnLogReset) {
+            btnLogReset.addEventListener('click', async function () {
+                const machineId = this.dataset.machineId;
+                const confirmed = confirm(`⚠️ LOG RESET METER\n\nLakukan ini SEBELUM reset fisik.\nLanjutkan?`);
+                if (!confirmed) return;
+                const notes = prompt('Catatan (opsional):');
+                this.disabled = true; this.innerText = 'SAVING...';
+                try {
+                    const response = await fetch(`/api/machines/${machineId}/reset`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                        body: JSON.stringify({ notes: notes || '' })
+                    });
+                    const result = await response.json();
+                    if (response.ok && result.status === 'success') { alert(`✅ Berhasil!`); window.location.reload(); }
+                    else { alert('❌ Gagal: ' + (result.message || 'Error')); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
+                } catch (err) { alert('❌ Error: ' + err.message); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
+            });
+        }
+    });
 </script>
 @endsection
-

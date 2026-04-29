@@ -42,7 +42,7 @@ class MachineController extends Controller
         $machine = Machine::findOrFail($id);
         $limit = (int) $request->get('limit', 15); // Show 15 per page
 
-        $readings = \App\Models\PowerReading::whereIn('device_id', function($query) use ($machine) {
+        $readings = \App\Models\PowerReadingRaw::whereIn('device_id', function($query) use ($machine) {
                         $query->select('id')->from('devices')->where('machine_id', $machine->id);
                     })
                     ->orderBy('recorded_at', 'desc')

@@ -32,13 +32,13 @@ class Machine extends Model
 
     public function meterResets()
     {
-        return $this->hasMany(MeterReset::class)->orderBy('reset_at', 'desc');
+        return $this->hasManyThrough(MeterReset::class, Device::class)->orderBy('reset_at', 'desc');
     }
 
     public function latestReading()
     {
         return $this->hasOneThrough(
-            PowerReading::class,
+            PowerReadingRaw::class,
             Device::class,
             'machine_id', // FK on devices
             'device_id',  // FK on power_readings
@@ -56,7 +56,7 @@ class Machine extends Model
     public function recentReadings()
     {
         return $this->hasManyThrough(
-            PowerReading::class,
+            PowerReadingRaw::class,
             Device::class,
             'machine_id',
             'device_id',

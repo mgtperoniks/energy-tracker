@@ -11,6 +11,7 @@ MODBUS_PORT       = int(os.getenv('MODBUS_PORT', 502))
 PHYSICAL_SLAVE_ID = int(os.getenv('MODBUS_SLAVE_ID', 1))
 REPORT_AS_SLAVE_ID = int(os.getenv('REPORT_AS_SLAVE_ID', 3))
 LARAVEL_API_URL   = os.getenv('MODBUS_API_URL', 'http://web/api/readings')
+DEVICE_TOKEN      = os.getenv('DEVICE_TOKEN', '') # Required for authentication
 INTERVAL_SECONDS  = int(os.getenv('POLLING_INTERVAL', 600))  # Default 10 minutes
 
 
@@ -157,7 +158,11 @@ def main():
         }
 
         try:
-            response = requests.post(LARAVEL_API_URL, json=payload, timeout=10)
+            headers = {
+                'X-Device-Token': DEVICE_TOKEN,
+                'Content-Type': 'application/json'
+            }
+            response = requests.post(LARAVEL_API_URL, json=payload, headers=headers, timeout=10)
 
             if response.status_code == 200:
                 if data:

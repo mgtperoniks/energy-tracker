@@ -4,26 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Machine;
-use App\Models\PowerReading;
-use App\Services\EnergyCalculationService;
+use App\Models\Device;
+use App\Models\MeterReset;
+use App\Models\PowerReadingRaw;
 use Illuminate\Http\Request;
 
 class MeterResetController extends Controller
 {
-    /**
-     * POST /api/machines/{id}/reset
-     *
-     * Call this BEFORE physically resetting the power meter.
-     * It will:
-     *   1. Capture the last known kWh reading from the DB.
-     *   2. Add it to the machine's kwh_baseline.
-     *   3. Log the reset event in meter_resets table.
-     *
-     * Request body (optional):
-     *   {
-     *     "notes": "Annual reset - 1 May 2026"
-     *   }
-     */
     public function store(Request $request, $id)
     {
         $machine = Machine::findOrFail($id);
@@ -32,53 +19,63 @@ class MeterResetController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        // Get the latest known kwh_total from power_readings
-        $latestReading = PowerReading::whereIn('device_id', function ($q) use ($machine) {
-                $q->select('id')->from('devices')->where('machine_id', $machine->id);
-            })
+        // Transitional hybrid compatibility: Ambil device utama dari mesin ini
+        $device = Device::where('machine_id', $machine->id)->first();
+
+        if (!$device) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No device found for this machine. Cannot determine pre-reset kWh.',
+            ], 422);
+        }
+
+        $latestReading = PowerReadingRaw::where('device_id', $device->id)
             ->orderBy('recorded_at', 'desc')
             ->first();
 
         if (!$latestReading) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'No readings found for this machine. Cannot determine pre-reset kWh.',
+                'message' => 'No readings found for this device.',
             ], 422);
         }
 
-        $lastKwh = $latestReading->kwh_total;
+        // Ambil nilai mentah sebelum di-reset
+        $lastRaw = $latestReading->meter_kwh_raw;
 
-        $service = new EnergyCalculationService();
-        $service->logManualReset(
-            machine:       $machine,
-            lastKwhTotal:  $lastKwh,
-            notes:         $validated['notes'] ?? "Manual reset via API. Pre-reset: {$lastKwh} kWh.",
-            performedBy:   auth()->id(),
-        );
+        MeterReset::create([
+            'device_id'    => $device->id,
+            'kwh_at_reset' => $lastRaw,
+            'notes'        => $validated['notes'] ?? "Manual reset via API. Pre-reset meter raw: {$lastRaw} kWh.",
+            'performed_by' => auth()->id(),
+            'reset_at'     => now(),
+        ]);
+
+        // Tambahkan ke baseline milik Device
+        $device->active_baseline_kwh = ($device->active_baseline_kwh ?? 0) + $lastRaw;
+        $device->save();
 
         return response()->json([
             'status'         => 'success',
-            'message'        => "Reset logged successfully for machine: {$machine->name}.",
+            'message'        => "Reset logged successfully for device: {$device->name}.",
             'data' => [
                 'machine_id'       => $machine->id,
-                'machine_name'     => $machine->name,
-                'kwh_at_reset'     => $lastKwh,
-                'new_baseline'     => $machine->fresh()->kwh_baseline,
+                'device_id'        => $device->id,
+                'kwh_at_reset'     => $lastRaw,
+                'new_baseline'     => $device->active_baseline_kwh,
                 'reset_at'         => now()->toDateTimeString(),
             ],
         ]);
     }
 
-    /**
-     * GET /api/machines/{id}/resets
-     *
-     * Returns the reset history for a machine.
-     */
     public function index($id)
     {
         $machine = Machine::findOrFail($id);
+        
+        // Transitional hybrid compatibility: Ambil device dari mesin ini
+        $deviceIds = Device::where('machine_id', $machine->id)->pluck('id');
 
-        $resets = $machine->meterResets()
+        $resets = MeterReset::whereIn('device_id', $deviceIds)
             ->with('performedBy:id,name')
             ->get();
 
@@ -88,8 +85,6 @@ class MeterResetController extends Controller
                 'machine'      => [
                     'id'            => $machine->id,
                     'name'          => $machine->name,
-                    'kwh_baseline'  => $machine->kwh_baseline,
-                    'lifetime_kwh'  => $machine->lifetime_kwh,
                 ],
                 'resets' => $resets,
             ],

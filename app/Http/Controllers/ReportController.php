@@ -2,97 +2,132 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Machine;
-use App\Models\DailyEnergySummary;
-use App\Models\PowerReading;
 use App\Models\Device;
+use App\Models\PowerReadingDaily;
+use App\Models\PollerLog;
+use App\Models\MeterReset;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function index(Request $request)
+    public function operational(Request $request)
     {
-        $machineId = $request->query('machine_id');
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
-        $isGenerated = $request->has('machine_id') || $request->has('start_date');
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+        
+        $devices = Device::with('machine')->get();
+        
+        $query = PowerReadingDaily::with('device.machine')
+            ->whereBetween('recorded_date', [$startDate, $endDate]);
 
-        $machines = Machine::orderBy('code')->get();
-        $reports = collect();
-
-        if ($isGenerated) {
-            $startDate = $startDate ?? now()->subDays(30)->toDateString();
-            $endDate = $endDate ?? now()->toDateString();
-
-            // First try daily_energy_summaries
-            $query = DailyEnergySummary::with('machine')
-                ->whereBetween('date', [$startDate, $endDate]);
-
-            if ($machineId) {
-                $query->where('machine_id', $machineId);
-            }
-
-            $reports = $query->orderBy('date', 'desc')->paginate(50);
-
-            // If no summary data found, generate from power_readings
-            if ($reports->isEmpty()) {
-                $deviceQuery = Device::where('type', 'power_meter');
-                if ($machineId) {
-                    $deviceQuery->where('machine_id', $machineId);
-                }
-                $devices = $deviceQuery->whereNotNull('machine_id')->get();
-
-                foreach ($devices as $device) {
-                    // Get readings grouped by date
-                    $dailyReadings = PowerReading::where('device_id', $device->id)
-                        ->whereDate('recorded_at', '>=', $startDate)
-                        ->whereDate('recorded_at', '<=', $endDate)
-                        ->orderBy('recorded_at', 'asc')
-                        ->get()
-                        ->groupBy(function ($reading) {
-                            return $reading->recorded_at->toDateString();
-                        });
-
-                    foreach ($dailyReadings as $date => $readings) {
-                        if ($readings->count() < 2) continue;
-
-                        $kwhDiff = $readings->last()->kwh_total - $readings->first()->kwh_total;
-                        if ($kwhDiff <= 0) {
-                            // Estimate from average power × hours
-                            $avgKw = $readings->avg('power_kw');
-                            $hours = $readings->first()->recorded_at->diffInMinutes($readings->last()->recorded_at) / 60;
-                            $kwhDiff = round($avgKw * $hours, 2);
-                        }
-
-                        if ($kwhDiff > 0) {
-                            DailyEnergySummary::updateOrCreate(
-                                [
-                                    'machine_id' => $device->machine_id,
-                                    'date' => $date,
-                                ],
-                                [
-                                    'kwh_usage' => round($kwhDiff, 2),
-                                ]
-                            );
-                        }
-                    }
-                }
-
-                // Re-query after generation
-                $query = DailyEnergySummary::with('machine')
-                    ->whereBetween('date', [$startDate, $endDate]);
-                if ($machineId) {
-                    $query->where('machine_id', $machineId);
-                }
-                $reports = $query->orderBy('date', 'desc')->paginate(50);
-            }
-        } else {
-            $startDate = now()->subDays(30)->toDateString();
-            $endDate = now()->toDateString();
+        if ($deviceId) {
+            $query->where('device_id', $deviceId);
         }
 
-        return view('reports', compact('reports', 'machines', 'machineId', 'startDate', 'endDate', 'isGenerated'));
+        $reports = $query->orderBy('recorded_date', 'desc')->paginate(50);
+
+        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate'));
+    }
+
+    public function accounting(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+        
+        $devices = Device::with('machine')->get();
+
+        $baseQuery = PowerReadingDaily::with('device.machine')
+            ->whereBetween('recorded_date', [$startDate, $endDate]);
+
+        if ($deviceId) {
+            $baseQuery->where('device_id', $deviceId);
+        }
+
+        // Clone query to avoid builder reuse
+        $reportsQuery = clone $baseQuery;
+        $costQuery = clone $baseQuery;
+        $rankingQuery = clone $baseQuery;
+
+        $reports = $reportsQuery->orderBy('recorded_date', 'desc')->paginate(50);
+        $totalCost = $costQuery->sum('energy_cost');
+        
+        // Top device cost ranking
+        $topDevices = $rankingQuery->select('device_id', DB::raw('SUM(energy_cost) as total_device_cost'))
+            ->groupBy('device_id')
+            ->orderBy('total_device_cost', 'desc')
+            ->limit(5)
+            ->with('device.machine')
+            ->get();
+
+        return view('analytics.accounting', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate', 'totalCost', 'topDevices'));
+    }
+
+    public function audit(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+        $severity = $request->query('severity'); 
+        $eventType = $request->query('event_type'); // poller, reset, anomaly
+
+        $devices = Device::with('machine')->get();
+        
+        // Poller Logs Query
+        $logsQuery = PollerLog::with('device.machine')
+            ->whereBetween('event_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+            
+        if ($deviceId) $logsQuery->where('device_id', $deviceId);
+        if ($severity) $logsQuery->where('status', $severity);
+        
+        if ($eventType === 'anomaly') {
+            $logsQuery->where(function($q) {
+                $q->where('message', 'like', '%anomaly%')
+                  ->orWhere('message', 'like', '%Leakage%');
+            });
+        }
+        
+        // Meter Resets Query
+        $resetsQuery = MeterReset::with('device.machine')
+            ->whereBetween('reset_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+            
+        if ($deviceId) $resetsQuery->where('device_id', $deviceId);
+
+        $limit = 100;
+
+        $logs = collect();
+        if ($eventType !== 'reset') {
+            $logs = $logsQuery->orderBy('event_at', 'desc')->limit($limit)->get();
+        }
+
+        $resets = collect();
+        // Ignore resets if user explicitly filtering by severity (WARNING/ERROR usually implies poller logs)
+        if ($eventType === 'reset' || (!$eventType && !$severity)) {
+            $resets = $resetsQuery->orderBy('reset_at', 'desc')->limit($limit)->get();
+        }
+
+        // Merge and sort in-memory up to max 200 items
+        $auditTrail = $logs->map(function($item) {
+            $type = str_contains(strtolower($item->message), 'anomaly') ? 'Anomaly' : 'Poller Event';
+            return (object) [
+                'type' => $type,
+                'timestamp' => $item->event_at,
+                'device' => $item->device,
+                'severity' => $item->status,
+                'message' => $item->message,
+            ];
+        })->concat($resets->map(function($item) {
+            return (object) [
+                'type' => 'Meter Reset',
+                'timestamp' => $item->reset_at,
+                'device' => $item->device,
+                'severity' => 'CRITICAL',
+                'message' => "Hardware counter reset. Last kWh: {$item->kwh_at_reset}. Notes: {$item->notes}"
+            ];
+        }))->sortByDesc('timestamp')->values();
+
+        return view('analytics.audit', compact('auditTrail', 'devices', 'deviceId', 'startDate', 'endDate', 'severity', 'eventType'));
     }
 }
