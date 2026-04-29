@@ -289,6 +289,7 @@
 </div>
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
@@ -377,26 +378,27 @@
                 // Add Voltage as secondary dataset
                 datasets.push({
                     label: 'Voltage (V)',
-                    data: data.map(item => item.voltage || 0),
+                    data: voltageData,
                     yAxisID: 'y_voltage',
                     fill: false,
-                    borderColor: 'orange',
+                    borderColor: '#ff6b00',
                     backgroundColor: 'transparent',
-                    borderWidth: 1.5,
-                    borderDash: [5, 5],
+                    borderWidth: 4,
                     pointRadius: 0,
-                    tension: 0.3
+                    pointHoverRadius: 5,
+                    tension: 0.25
                 });
             } else if (currentMetric === 'voltage') {
                 unit = 'V';
                 datasets.push({
                     label: 'Voltage (V)',
-                    data: data.map(item => item.voltage || 0),
+                    data: voltageData,
                     yAxisID: 'y_power', // Re-use left axis for single view
-                    borderColor: '#f97316',
-                    borderWidth: 1.5,
+                    borderColor: '#ff6b00',
+                    borderWidth: 4,
                     pointRadius: 0,
-                    tension: 0.3
+                    pointHoverRadius: 5,
+                    tension: 0.25
                 });
             } else if (currentMetric === 'current') {
                 unit = 'A';
@@ -421,6 +423,10 @@
                     tension: 0.3
                 });
             }
+
+            const voltageData = data.map(item => item.voltage || 0);
+            const minVoltage = voltageData.length > 0 ? Math.min(...voltageData.filter(v => v > 0)) : 0;
+            const voltageAxisMin = (minVoltage >= 380) ? 380 : 0;
 
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -450,6 +456,35 @@
                                     return label;
                                 }
                             }
+                        },
+                        annotation: {
+                            annotations: {
+                                thresholdLine: {
+                                    type: 'line',
+                                    yScaleID: (currentMetric === 'power' ? 'y_voltage' : 'y_power'),
+                                    yMin: 380,
+                                    yMax: 380,
+                                    borderColor: 'rgba(255, 0, 0, 0.8)',
+                                    borderWidth: 2,
+                                    display: (currentMetric === 'power' || currentMetric === 'voltage'),
+                                    label: {
+                                        display: true,
+                                        content: 'LOW VOLTAGE LIMIT',
+                                        position: 'start',
+                                        backgroundColor: 'rgba(255, 0, 0, 0.8)',
+                                        font: { size: 8, weight: 'bold' }
+                                    }
+                                },
+                                dangerZone: {
+                                    type: 'box',
+                                    yScaleID: (currentMetric === 'power' ? 'y_voltage' : 'y_power'),
+                                    yMin: 0,
+                                    yMax: 380,
+                                    backgroundColor: 'rgba(255, 0, 0, 0.08)',
+                                    borderWidth: 0,
+                                    display: (currentMetric === 'power' || currentMetric === 'voltage')
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -458,7 +493,9 @@
                             position: 'left',
                             grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false }, 
                             ticks: { font: { size: 9 } },
-                            title: { display: true, text: (currentMetric === 'power' ? 'kW' : unit), font: { size: 9, weight: 'bold' } }
+                            title: { display: true, text: (currentMetric === 'power' ? 'kW' : unit), font: { size: 9, weight: 'bold' } },
+                            min: (currentMetric === 'voltage' ? voltageAxisMin : undefined),
+                            max: (currentMetric === 'voltage' ? 550 : undefined)
                         },
                         y_voltage: {
                             type: 'linear',
@@ -466,7 +503,9 @@
                             display: (currentMetric === 'power'),
                             grid: { drawOnChartArea: false },
                             ticks: { font: { size: 9 } },
-                            title: { display: true, text: 'V', font: { size: 9, weight: 'bold' } }
+                            title: { display: true, text: 'V', font: { size: 9, weight: 'bold' } },
+                            min: voltageAxisMin,
+                            max: 550
                         },
                         x: { 
                             grid: { display: false }, 
