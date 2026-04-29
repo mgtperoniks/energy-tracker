@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+<!-- Flatpickr for 24h Datetime Picker (Localized for Offline) -->
+<link rel="stylesheet" href="{{ asset('assets/vendor/flatpickr/flatpickr.min.css') }}">
+<script src="{{ asset('assets/vendor/flatpickr/flatpickr.min.js') }}"></script>
+
 <main class="md:ml-64 pt-16 pb-20 md:pb-8 min-h-screen bg-surface">
     <div class="p-4 md:p-6 max-w-7xl mx-auto">
         <!-- Header Section - Compact -->
@@ -100,11 +104,11 @@
                     <div class="flex items-center gap-1.5 border-l border-surface-container pl-2 ml-1" id="forensic-filter">
                         <div class="flex flex-col">
                             <span class="text-[6px] font-black uppercase text-outline">Start</span>
-                            <input type="datetime-local" id="forensic-start" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none">
+                            <input type="text" id="forensic-start" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none" placeholder="YYYY-MM-DD HH:mm">
                         </div>
                         <div class="flex flex-col">
                             <span class="text-[6px] font-black uppercase text-outline">End</span>
-                            <input type="datetime-local" id="forensic-end" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none">
+                            <input type="text" id="forensic-end" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none" placeholder="YYYY-MM-DD HH:mm">
                         </div>
                         <button id="btn-forensic-generate" class="bg-primary text-white text-[8px] font-black px-2 py-1.5 rounded self-end hover:brightness-110 transition-all uppercase tracking-tighter">
                             Gen
@@ -324,6 +328,17 @@
         const forensicStart = document.getElementById('forensic-start');
         const forensicEnd = document.getElementById('forensic-end');
 
+        // Initialize Flatpickr for 24h format
+        const fpConfig = {
+            enableTime: true,
+            time_24hr: true,
+            dateFormat: "Y-m-d H:i",
+            disableMobile: "true",
+            allowInput: true
+        };
+        const startPicker = flatpickr(forensicStart, fpConfig);
+        const endPicker = flatpickr(forensicEnd, fpConfig);
+
         metricSelect.addEventListener('change', function(e) {
             currentMetric = e.target.value;
             fetchAndRender();
@@ -340,8 +355,8 @@
                 
                 currentHours = parseInt(this.dataset.range);
                 // Reset forensic inputs when using quick range
-                forensicStart.value = '';
-                forensicEnd.value = '';
+                startPicker.clear();
+                endPicker.clear();
                 fetchAndRender();
             });
         });

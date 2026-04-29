@@ -115,15 +115,19 @@
             </div>
             <input class="bg-white/10 border-none text-white text-sm rounded-md pl-10 pr-4 py-2 w-48 lg:w-64 focus:ring-1 focus:ring-white/30 placeholder-sky-100/50 outline-none" placeholder="Global Search..." type="text"/>
         </div>
-        <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 flex">
+        <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 flex relative" title="Notifications">
             <span class="material-symbols-outlined text-white" data-icon="notifications">notifications</span>
+            <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-sky-800"></span>
         </button>
-        <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 hidden md:flex">
+        <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 hidden md:flex" title="Settings">
             <span class="material-symbols-outlined text-white" data-icon="settings">settings</span>
         </button>
-        <div class="h-8 w-8 ml-2 rounded-full bg-sky-100/20 border border-white/20 flex items-center justify-center overflow-hidden">
-            <span class="material-symbols-outlined text-white">account_circle</span>
-        </div>
+        <form action="{{ route('logout') }}" method="POST" class="m-0">
+            @csrf
+            <button type="submit" class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 flex items-center justify-center" title="Logout">
+                <span class="material-symbols-outlined text-white">account_circle</span>
+            </button>
+        </form>
     </div>
 </header>
 
@@ -237,20 +241,7 @@
         </a>
 
     </nav>
-    <div class="px-3 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-1">
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
-            <span class="material-symbols-outlined">help</span>
-            <span>Support</span>
-        </a>
-        <!-- Ensure Form Logout -->
-        <form action="{{ route('logout') }}" method="POST" class="m-0">
-            @csrf
-            <button type="submit" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                <span class="material-symbols-outlined">logout</span>
-                <span>Logout</span>
-            </button>
-        </form>
-    </div>
+
 </aside>
 
 <!-- Main Content Area -->
