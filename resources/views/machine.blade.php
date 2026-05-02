@@ -743,8 +743,18 @@
                 }
 
                 // Redirect to export route
+                const originalContent = btnExport.innerHTML;
+                btnExport.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Exporting...';
+                btnExport.disabled = true;
+
                 const exportUrl = `/monitoring/meters/${machineId}/export?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
                 window.location.href = exportUrl;
+
+                // Reset button after a delay (since we can't easily detect download completion)
+                setTimeout(() => {
+                    btnExport.innerHTML = originalContent;
+                    btnExport.disabled = false;
+                }, 5000);
             });
         }
 
