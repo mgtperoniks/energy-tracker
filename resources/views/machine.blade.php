@@ -7,6 +7,20 @@
 
 <main class="md:ml-64 pt-16 pb-20 md:pb-8 min-h-screen bg-surface">
     <div class="p-4 md:p-6 max-w-7xl mx-auto">
+        <!-- Alerts -->
+        @if(session('success'))
+            <div class="bg-secondary-container text-on-secondary-container p-3 rounded text-xs font-bold mb-4 flex items-center gap-2 border border-secondary/20">
+                <span class="material-symbols-outlined text-sm">check_circle</span>
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="bg-error-container text-error p-3 rounded text-xs font-bold mb-4 flex items-center gap-2 border border-error/20">
+                <span class="material-symbols-outlined text-sm">error</span>
+                {{ session('error') }}
+            </div>
+        @endif
+
         <!-- Header Section - Compact -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4">
             <div>
@@ -27,7 +41,7 @@
                 <p class="text-on-surface-variant text-[10px] mt-0.5">Code: {{ $machine->code }} | Modbus TCP/RS485</p>
             </div>
             <div class="flex gap-2">
-                <button class="px-3 py-1.5 bg-surface-container-high text-on-surface text-[10px] font-bold rounded hover:bg-surface-container-highest transition-colors flex items-center gap-1.5">
+                <button id="btn-export-excel" data-machine-id="{{ $machine->id }}" class="px-3 py-1.5 bg-surface-container-high text-on-surface text-[10px] font-bold rounded hover:bg-surface-container-highest transition-colors flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-sm">download</span>
                     Export
                 </button>
@@ -692,6 +706,47 @@
         document.body.addEventListener('click', function(e) {
             if (e.target.classList.contains('detail-btn')) { openModal(e.target.dataset); }
         });
+
+        // Export Logic
+        const btnExport = document.getElementById('btn-export-excel');
+        if (btnExport) {
+            btnExport.addEventListener('click', function() {
+                const machineId = this.dataset.machineId;
+                let start = forensicStart.value;
+                let end = forensicEnd.value;
+
+                if (!start || !end) {
+                    // If no forensic range selected, ask or use default (e.g. today)
+                    const confirmDefault = confirm('Anda belum memilih periode di filter "Forensic". Gunakan 3 hari terakhir sebagai default?');
+                    if (!confirmDefault) return;
+                    
+                    const now = new Date();
+                    const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+                    
+                    start = threeDaysAgo.toISOString().slice(0, 16).replace('T', ' ');
+                    end = now.toISOString().slice(0, 16).replace('T', ' ');
+                }
+
+                // Client-side validation for 7 days
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+                const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+
+                if (diffDays > 7) {
+                    alert('⚠️ PERIODE TERLALU BESAR\n\nBatas maksimal download adalah 7 hari (' + diffDays.toFixed(1) + ' hari terpilih).\n\nSilakan pilih rentang waktu yang lebih pendek untuk menjaga kestabilan sistem.');
+                    return;
+                }
+
+                if (diffDays <= 0) {
+                    alert('End date harus setelah start date.');
+                    return;
+                }
+
+                // Redirect to export route
+                const exportUrl = `/monitoring/meters/${machineId}/export?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+                window.location.href = exportUrl;
+            });
+        }
 
         // Reset Logic
         const btnLogReset = document.getElementById('btn-log-reset');

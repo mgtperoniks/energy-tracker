@@ -7,6 +7,7 @@ use App\Models\PowerReadingRaw;
 use App\Models\PowerReadingDaily;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use App\Exports\TelemetryExport;
 
 class MachineDashboardController extends Controller
 {
@@ -140,5 +141,41 @@ class MachineDashboardController extends Controller
             'eventLogs',
             'resetCount'
         ));
+    }
+    public function export(Request $request, $id)
+    {
+        $machine = Machine::with('devices')->findOrFail($id);
+        $device = $machine->devices->first();
+
+        if (!$device) {
+            return back()->with('error', 'No device found for this machine.');
+        }
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        if (!$startDate || !$endDate) {
+            $endDate = now();
+            $startDate = now()->subDays(3);
+        } else {
+            try {
+                $startDate = Carbon::parse($startDate);
+                $endDate = Carbon::parse($endDate);
+            } catch (\Exception $e) {
+                return back()->with('error', 'Invalid date format.');
+            }
+        }
+
+        // Limit to 7 days as requested by user to prevent crashes
+        if ($startDate->diffInDays($endDate) > 7) {
+            return back()->with('error', 'Batas maksimal download adalah 7 hari per export. Silakan perkecil periode pencarian.');
+        }
+
+        $filename = "Telemetry_{$machine->code}_" . $startDate->format('Ymd') . "_" . $endDate->format('Ymd') . ".xlsx";
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new TelemetryExport($device->id, $startDate, $endDate),
+            $filename
+        );
     }
 }

@@ -17,6 +17,7 @@ Route::middleware('auth')->group(function () {
     // 2. MONITORING
     Route::prefix('monitoring')->name('monitoring.')->group(function () {
         Route::get('/meters/{id?}', [\App\Http\Controllers\MachineDashboardController::class, 'show'])->name('meters');
+        Route::get('/meters/{id}/export', [\App\Http\Controllers\MachineDashboardController::class, 'export'])->name('meters.export');
         Route::get('/environmental', [\App\Http\Controllers\EnvironmentalController::class, 'index'])->name('environmental');
         Route::get('/system-health', [\App\Http\Controllers\SystemHealthController::class, 'index'])->name('health');
     });
