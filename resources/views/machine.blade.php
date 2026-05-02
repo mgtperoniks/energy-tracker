@@ -114,17 +114,17 @@
                         <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
                     </div>
 
-                    <!-- Forensic Mode UI -->
+                    <!-- Custom Range / Forensic UI -->
                     <div class="flex items-center gap-1.5 border-l border-surface-container pl-2 ml-1" id="forensic-filter">
                         <div class="flex flex-col">
-                            <span class="text-[6px] font-black uppercase text-outline">Start</span>
-                            <input type="text" id="forensic-start" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none" placeholder="YYYY-MM-DD HH:mm">
+                            <span class="text-[8px] font-black uppercase text-outline">Start</span>
+                            <input type="text" id="forensic-start" class="bg-surface-container-low text-[10px] px-2 py-1 rounded font-bold text-on-surface-variant outline-none border-none w-28" placeholder="YYYY-MM-DD HH:mm">
                         </div>
                         <div class="flex flex-col">
-                            <span class="text-[6px] font-black uppercase text-outline">End</span>
-                            <input type="text" id="forensic-end" class="bg-surface-container-low text-[8px] px-1 py-0.5 rounded font-bold text-on-surface-variant outline-none border-none" placeholder="YYYY-MM-DD HH:mm">
+                            <span class="text-[8px] font-black uppercase text-outline">End</span>
+                            <input type="text" id="forensic-end" class="bg-surface-container-low text-[10px] px-2 py-1 rounded font-bold text-on-surface-variant outline-none border-none w-28" placeholder="YYYY-MM-DD HH:mm">
                         </div>
-                        <button id="btn-forensic-generate" class="bg-primary text-white text-[8px] font-black px-2 py-1.5 rounded self-end hover:brightness-110 transition-all uppercase tracking-tighter">
+                        <button id="btn-forensic-generate" class="bg-primary text-white text-[10px] font-black px-3 py-1.5 rounded self-end hover:brightness-110 transition-all uppercase tracking-tighter">
                             Gen
                         </button>
                     </div>
@@ -716,15 +716,15 @@
                 let end = forensicEnd.value;
 
                 if (!start || !end) {
-                    // If no forensic range selected, ask or use default (e.g. today)
-                    const confirmDefault = confirm('Anda belum memilih periode di filter "Forensic". Gunakan 3 hari terakhir sebagai default?');
-                    if (!confirmDefault) return;
-                    
+                    // If custom range is empty, use the current active quick range (1H, 4H, 12H, etc.)
                     const now = new Date();
-                    const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+                    const startDateObj = new Date(now.getTime() - currentHours * 60 * 60 * 1000);
                     
-                    start = threeDaysAgo.toISOString().slice(0, 16).replace('T', ' ');
+                    start = startDateObj.toISOString().slice(0, 16).replace('T', ' ');
                     end = now.toISOString().slice(0, 16).replace('T', ' ');
+                    
+                    const confirmQuickRange = confirm(`Anda belum memilih custom periode.\nDownload data berdasarkan rentang chart yang aktif (${currentHours} jam terakhir)?`);
+                    if (!confirmQuickRange) return;
                 }
 
                 // Client-side validation for 7 days

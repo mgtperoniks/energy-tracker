@@ -52,12 +52,12 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
     public function map($reading): array
     {
         return [
-            $reading->recorded_at->format('Y-m-d H:i:s'),
-            number_format((float)$reading->power_kw, 2, '.', ''),
-            number_format((float)$reading->voltage, 1, '.', ''),
-            number_format((float)$reading->current, 1, '.', ''),
-            number_format((float)$reading->power_factor, 2, '.', ''),
-            number_format((float)$reading->kwh_total, 2, '.', ''),
+            $reading->recorded_at ? $reading->recorded_at->format('Y-m-d H:i:s') : '-',
+            number_format((float)($reading->power_kw ?? 0), 2, '.', ''),
+            number_format((float)($reading->voltage ?? 0), 1, '.', ''),
+            number_format((float)($reading->current ?? 0), 1, '.', ''),
+            number_format((float)($reading->power_factor ?? 0), 2, '.', ''),
+            number_format((float)($reading->kwh_total ?? 0), 2, '.', ''),
         ];
     }
 

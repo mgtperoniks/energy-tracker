@@ -173,9 +173,14 @@ class MachineDashboardController extends Controller
 
         $filename = "Telemetry_{$machine->code}_" . $startDate->format('Ymd') . "_" . $endDate->format('Ymd') . ".xlsx";
 
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new TelemetryExport($device->id, $startDate, $endDate),
-            $filename
-        );
+        try {
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new TelemetryExport($device->id, $startDate, $endDate),
+                $filename
+            );
+        } catch (\Exception $e) {
+            \Log::error('Export Error: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membuat file Excel: ' . $e->getMessage());
+        }
     }
 }
