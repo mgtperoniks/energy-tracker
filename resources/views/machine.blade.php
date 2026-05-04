@@ -438,11 +438,18 @@
                 return;
             }
 
-            const powerData = data.map(item => item.power_kw || 0);
-            const actualMaxPower = powerData.length > 0 ? Math.max(...powerData) : 0;
+            const powerData = data.map(item =>
+                item.power_kw !== null ? Number(item.power_kw) : null
+            );
+            const validPowerData = powerData.filter(v => v !== null);
+            const actualMaxPower = validPowerData.length > 0
+                ? Math.max(...validPowerData)
+                : 0;
             const powerAxisMax = Math.max(actualMaxPower * 1.1, 6.8);
 
-            const voltageData = data.map(item => item.voltage || 0);
+            const voltageData = data.map(item =>
+                item.voltage !== null ? Number(item.voltage) : null
+            );
 
             const labels = data.map(item => {
                 const d = new Date(item.timestamp);
@@ -503,7 +510,9 @@
                 unit = 'A';
                 datasets.push({
                     label: 'Current (A)',
-                    data: data.map(item => item.current || 0),
+                    data: data.map(item =>
+                        item.current !== null ? Number(item.current) : null
+                    ),
                     yAxisID: 'y_power',
                     borderColor: '#10b981',
                     borderWidth: 1.5,
@@ -515,7 +524,9 @@
                 unit = '';
                 datasets.push({
                     label: 'PF',
-                    data: data.map(item => item.power_factor || 0),
+                    data: data.map(item =>
+                        item.power_factor !== null ? Number(item.power_factor) : null
+                    ),
                     yAxisID: 'y_power',
                     borderColor: '#8b5cf6',
                     borderWidth: 1.5,
@@ -549,6 +560,8 @@
                                     if (label) label += ': ';
                                     if (context.parsed.y !== null) {
                                         label += context.parsed.y.toFixed(2);
+                                    } else {
+                                        label += 'No Data';
                                     }
                                     return label;
                                 }

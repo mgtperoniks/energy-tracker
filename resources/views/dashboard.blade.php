@@ -118,7 +118,7 @@
                                     const d = new Date(item.timestamp);
                                     return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
                                 });
-                                const values = data.map(item => item.power_kw || 0);
+                                const values = data.map(item => item.power_kw !== null ? Number(item.power_kw) : null);
 
                                 new Chart(ctx, {
                                     type: 'line',
@@ -152,7 +152,10 @@
                                                 titleFont: { size: 12, weight: 'bold' },
                                                 bodyFont: { size: 13 },
                                                 callbacks: {
-                                                    label: (context) => ` Load: ${context.parsed.y.toFixed(2)} kW`
+                                                    label: (context) => {
+                                                        const val = context.parsed.y;
+                                                        return val !== null ? ` Load: ${val.toFixed(2)} kW` : ` Load: No Data`;
+                                                    }
                                                 }
                                             }
                                         },
