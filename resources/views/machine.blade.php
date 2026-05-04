@@ -466,7 +466,8 @@
                     borderColor: '#00628c',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: false
                 });
                 
                 // Add Voltage as secondary dataset
@@ -481,7 +482,8 @@
                     borderDash: [3, 3],
                     pointRadius: 0,
                     pointHoverRadius: 5,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: false
                 });
             } else if (currentMetric === 'voltage') {
                 unit = 'V';
@@ -494,7 +496,8 @@
                     borderDash: [3, 3],
                     pointRadius: 0,
                     pointHoverRadius: 5,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: false
                 });
             } else if (currentMetric === 'current') {
                 unit = 'A';
@@ -505,7 +508,8 @@
                     borderColor: '#10b981',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: false
                 });
             } else if (currentMetric === 'pf') {
                 unit = '';
@@ -516,7 +520,8 @@
                     borderColor: '#8b5cf6',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: false
                 });
             }
 

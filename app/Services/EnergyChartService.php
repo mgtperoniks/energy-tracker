@@ -58,7 +58,9 @@ class EnergyChartService
                 'current'   => $item->current !== null ? (float) $item->current : null,
                 'power_factor' => $item->power_factor !== null ? (float) $item->power_factor : null,
             ];
-        });
+        })->toArray();
+
+        $points = $this->applyGaps($points, 5, 'minute');
 
         return $this->formatResponse('power_readings_raw', 'minute', $points);
     }
@@ -82,7 +84,9 @@ class EnergyChartService
                 'current'   => $item->avg_current !== null ? (float) $item->avg_current : null,
                 'power_factor' => $item->avg_power_factor !== null ? (float) $item->avg_power_factor : null,
             ];
-        });
+        })->toArray();
+
+        $points = $this->applyGaps($points, 90, 'hourly');
 
         return $this->formatResponse('power_readings_hourly', 'hourly', $points);
     }
@@ -106,20 +110,71 @@ class EnergyChartService
                 'current'   => $item->avg_current !== null ? (float) $item->avg_current : null,
                 'power_factor' => $item->avg_power_factor !== null ? (float) $item->avg_power_factor : null,
             ];
-        });
+        })->toArray();
+
+        $points = $this->applyGaps($points, 36 * 60, 'daily');
 
         return $this->formatResponse('power_readings_daily', 'daily', $points);
     }
 
-    private function formatResponse(string $source, string $resolution, $points): array
+    private function formatResponse(string $source, string $resolution, array $points): array
     {
         return [
             'metadata' => [
                 'source' => $source,
                 'resolution' => $resolution,
-                'total_points' => $points->count()
+                'total_points' => count($points)
             ],
             'data' => $points
         ];
+    }
+
+    /**
+     * Menyisipkan null-point jika terdapat gap waktu yang terlalu besar.
+     */
+    private function applyGaps(array $points, int $thresholdMinutes, string $resolution): array
+    {
+        if (empty($points)) {
+            return [];
+        }
+
+        $patchedPoints = [];
+        $previousPoint = null;
+
+        foreach ($points as $currentPoint) {
+            if ($previousPoint) {
+                $prevTime = Carbon::parse($previousPoint['timestamp']);
+                $currTime = Carbon::parse($currentPoint['timestamp']);
+                
+                $diffInMinutes = $prevTime->diffInMinutes($currTime);
+
+                if ($diffInMinutes > $thresholdMinutes) {
+                    $increment = match($resolution) {
+                        'minute' => 1,
+                        'hourly' => 60,
+                        'daily'  => 1440,
+                        default  => 1,
+                    };
+                    
+                    $nullTime = $prevTime->copy()->addMinutes($increment);
+                    
+                    if ($nullTime->lt($currTime)) {
+                        $patchedPoints[] = [
+                            'timestamp' => $nullTime->toIso8601String(),
+                            'kwh_total' => null,
+                            'kwh_usage' => null,
+                            'power_kw'  => null,
+                            'voltage'   => null,
+                            'current'   => null,
+                            'power_factor' => null,
+                        ];
+                    }
+                }
+            }
+            $patchedPoints[] = $currentPoint;
+            $previousPoint = $currentPoint;
+        }
+
+        return $patchedPoints;
     }
 }

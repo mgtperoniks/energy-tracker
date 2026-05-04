@@ -136,7 +136,8 @@
                                             pointBackgroundColor: '#00628c',
                                             pointBorderColor: '#fff',
                                             pointBorderWidth: 2,
-                                            tension: 0.4
+                                            tension: 0.4,
+                                            spanGaps: false
                                         }]
                                     },
                                     options: {
