@@ -322,6 +322,7 @@
 </div>
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
@@ -536,6 +537,59 @@
                 });
             }
 
+            // Calculate annotations for downtime
+            let chartAnnotations = {};
+            let downtimeStart = -1;
+            let regionCount = 0;
+            let lastActiveIndex = -1;
+
+            powerData.forEach((val, idx) => {
+                if (val === null) {
+                    if (downtimeStart === -1) downtimeStart = idx;
+                } else {
+                    lastActiveIndex = idx;
+                    if (downtimeStart !== -1) {
+                        chartAnnotations['downtime_' + regionCount++] = {
+                            type: 'box',
+                            xMin: downtimeStart - 0.5,
+                            xMax: idx - 0.5,
+                            backgroundColor: 'rgba(150, 150, 150, 0.12)',
+                            borderWidth: 0
+                        };
+                        downtimeStart = -1;
+                    }
+                }
+            });
+
+            if (downtimeStart !== -1) {
+                chartAnnotations['downtime_' + regionCount++] = {
+                    type: 'box',
+                    xMin: downtimeStart - 0.5,
+                    xMax: powerData.length - 1,
+                    backgroundColor: 'rgba(150, 150, 150, 0.12)',
+                    borderWidth: 0
+                };
+            }
+
+            if (lastActiveIndex !== -1 && lastActiveIndex < powerData.length - 1) {
+                chartAnnotations['lastActiveLine'] = {
+                    type: 'line',
+                    xMin: lastActiveIndex,
+                    xMax: lastActiveIndex,
+                    borderColor: 'rgba(239, 68, 68, 0.6)',
+                    borderWidth: 1.5,
+                    label: {
+                        content: 'Machine OFF',
+                        display: true,
+                        position: 'start',
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                        color: '#fff',
+                        font: { size: 9, weight: 'bold' },
+                        padding: 4
+                    }
+                };
+            }
+
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -566,6 +620,9 @@
                                     return label;
                                 }
                             }
+                        },
+                        annotation: {
+                            annotations: chartAnnotations
                         }
                     },
                     scales: {

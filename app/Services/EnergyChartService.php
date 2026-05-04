@@ -6,6 +6,7 @@ use App\Models\PowerReadingRaw;
 use App\Models\PowerReadingHourly;
 use App\Models\PowerReadingDaily;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 
 class EnergyChartService
 {
@@ -60,9 +61,7 @@ class EnergyChartService
             ];
         })->toArray();
 
-        $points = $this->applyGaps($points, 5, 'minute');
-
-        return $this->formatResponse('power_readings_raw', 'minute', $points);
+        return $this->formatResponse('power_readings_raw', 'minute', $this->normalizeTimeline($points, $start, $end, 'minute'));
     }
 
     private function queryHourly(int $deviceId, Carbon $start, Carbon $end): array
@@ -86,9 +85,7 @@ class EnergyChartService
             ];
         })->toArray();
 
-        $points = $this->applyGaps($points, 90, 'hourly');
-
-        return $this->formatResponse('power_readings_hourly', 'hourly', $points);
+        return $this->formatResponse('power_readings_hourly', 'hourly', $this->normalizeTimeline($points, $start, $end, 'hourly'));
     }
 
     private function queryDaily(int $deviceId, Carbon $start, Carbon $end): array
@@ -112,9 +109,7 @@ class EnergyChartService
             ];
         })->toArray();
 
-        $points = $this->applyGaps($points, 36 * 60, 'daily');
-
-        return $this->formatResponse('power_readings_daily', 'daily', $points);
+        return $this->formatResponse('power_readings_daily', 'daily', $this->normalizeTimeline($points, $start, $end, 'daily'));
     }
 
     private function formatResponse(string $source, string $resolution, array $points): array
@@ -130,51 +125,60 @@ class EnergyChartService
     }
 
     /**
-     * Menyisipkan null-point jika terdapat gap waktu yang terlalu besar.
+     * Melakukan normalisasi timeline agar rentang waktu dari start sampai end
+     * terisi penuh, baik dengan data aktual maupun null.
      */
-    private function applyGaps(array $points, int $thresholdMinutes, string $resolution): array
+    private function normalizeTimeline(array $points, Carbon $start, Carbon $end, string $resolution): array
     {
-        if (empty($points)) {
-            return [];
+        $interval = match($resolution) {
+            'minute' => '1 minute',
+            'hourly' => '1 hour',
+            'daily'  => '1 day',
+            default  => '1 minute',
+        };
+
+        $period = CarbonPeriod::create($start, $interval, $end);
+        
+        // Buat lookup map berdasarkan key normalisasi
+        $map = [];
+        foreach ($points as $point) {
+            $key = $this->getNormalizationKey($point['timestamp'], $resolution);
+            $map[$key] = $point;
         }
 
-        $patchedPoints = [];
-        $previousPoint = null;
-
-        foreach ($points as $currentPoint) {
-            if ($previousPoint) {
-                $prevTime = Carbon::parse($previousPoint['timestamp']);
-                $currTime = Carbon::parse($currentPoint['timestamp']);
-                
-                $diffInMinutes = $prevTime->diffInMinutes($currTime);
-
-                if ($diffInMinutes > $thresholdMinutes) {
-                    $increment = match($resolution) {
-                        'minute' => 1,
-                        'hourly' => 60,
-                        'daily'  => 1440,
-                        default  => 1,
-                    };
-                    
-                    $nullTime = $prevTime->copy()->addMinutes($increment);
-                    
-                    if ($nullTime->lt($currTime)) {
-                        $patchedPoints[] = [
-                            'timestamp' => $nullTime->toIso8601String(),
-                            'kwh_total' => null,
-                            'kwh_usage' => null,
-                            'power_kw'  => null,
-                            'voltage'   => null,
-                            'current'   => null,
-                            'power_factor' => null,
-                        ];
-                    }
-                }
+        $normalized = [];
+        foreach ($period as $date) {
+            $key = $this->getNormalizationKey($date, $resolution);
+            
+            if (isset($map[$key])) {
+                // Gunakan timestamp asli dari DB untuk presisi
+                $normalized[] = $map[$key];
+            } else {
+                // Buat baris null untuk slot yang kosong
+                $normalized[] = [
+                    'timestamp' => $date->toIso8601String(),
+                    'kwh_total' => null,
+                    'kwh_usage' => null,
+                    'power_kw'  => null,
+                    'voltage'   => null,
+                    'current'   => null,
+                    'power_factor' => null,
+                ];
             }
-            $patchedPoints[] = $currentPoint;
-            $previousPoint = $currentPoint;
         }
 
-        return $patchedPoints;
+        return $normalized;
+    }
+
+    private function getNormalizationKey($timestamp, string $resolution): string
+    {
+        $date = $timestamp instanceof Carbon ? $timestamp : Carbon::parse($timestamp);
+        
+        return match($resolution) {
+            'minute' => $date->format('Y-m-d H:i'),
+            'hourly' => $date->format('Y-m-d H:00'),
+            'daily'  => $date->format('Y-m-d'),
+            default  => $date->format('Y-m-d H:i'),
+        };
     }
 }
