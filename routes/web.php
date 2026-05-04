@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     // 3. ANALYTICS
     Route::prefix('analytics')->name('analytics.')->group(function () {
         Route::get('/operational', [\App\Http\Controllers\ReportController::class, 'operational'])->name('operational');
+        Route::get('/operational/export', [\App\Http\Controllers\ReportController::class, 'exportOperational'])->name('operational.export');
         Route::get('/accounting', [\App\Http\Controllers\ReportController::class, 'accounting'])->name('accounting');
         Route::get('/audit', [\App\Http\Controllers\ReportController::class, 'audit'])->name('audit');
     });

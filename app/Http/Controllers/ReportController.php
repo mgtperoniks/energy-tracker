@@ -8,6 +8,8 @@ use App\Models\PollerLog;
 use App\Models\MeterReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Exports\OperationalReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
@@ -19,6 +21,31 @@ class ReportController extends Controller
         
         $devices = Device::with('machine')->get();
         
+        $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
+
+        $reports = $query->paginate(50)->withQueryString();
+
+        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate'));
+    }
+
+    public function exportOperational(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+
+        $filename = 'energy_operational_report_' . now()->format('Ymd_Hi') . '.xlsx';
+
+        $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
+
+        return Excel::download(
+            new OperationalReportExport($query), 
+            $filename
+        );
+    }
+
+    private function buildOperationalQuery($startDate, $endDate, $deviceId = null)
+    {
         $query = PowerReadingDaily::with('device.machine')
             ->whereBetween('recorded_date', [$startDate, $endDate]);
 
@@ -26,9 +53,7 @@ class ReportController extends Controller
             $query->where('device_id', $deviceId);
         }
 
-        $reports = $query->orderBy('recorded_date', 'desc')->paginate(50);
-
-        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate'));
+        return $query->orderBy('recorded_date', 'desc');
     }
 
     public function accounting(Request $request)
