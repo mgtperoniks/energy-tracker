@@ -9,13 +9,19 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('energy:aggregate-hourly')
-    ->hourlyAt(3)
+    ->hourly()
     ->withoutOverlapping()
-    ->onSuccess(fn () => Illuminate\Support\Facades\Cache::forever('cron_aggregate_hourly', now()));
+    ->onSuccess(function () {
+        Illuminate\Support\Facades\Cache::forever('cron_aggregate_hourly', now());
+        logger()->info('Aggregation success (hourly)');
+    });
 Schedule::command('energy:aggregate-daily')
     ->dailyAt('00:05')
     ->withoutOverlapping()
-    ->onSuccess(fn () => Illuminate\Support\Facades\Cache::forever('cron_aggregate_daily', now()));
+    ->onSuccess(function () {
+        Illuminate\Support\Facades\Cache::forever('cron_aggregate_daily', now());
+        logger()->info('Aggregation success (daily)');
+    });
 
 // --- DATA RETENTION LIFECYCLE ---
 
