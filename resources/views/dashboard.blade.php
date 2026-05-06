@@ -282,7 +282,7 @@
                                 <td class="px-6 py-5 text-sm text-on-surface-variant">Power Meter Node</td>
                                 <td class="px-6 py-5 font-mono text-sm">{{ number_format($machine->todaySummary->kwh_usage ?? 0, 1) }}</td>
                                 <td class="px-6 py-5">
-                                    <span class="px-2 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase tracking-wide">Nominal</span>
+                                    {!! $machine->devices->first()?->status_badge ?? '<span class="bg-surface-container-highest text-outline px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">No Device</span>' !!}
                                 </td>
                                 <td class="px-6 py-5 text-right text-xs text-on-surface-variant">
                                     {{ $machine->latestReading ? ($machine->latestReading->recorded_at ? $machine->latestReading->recorded_at->diffForHumans() : 'No Data') : 'No Data' }}

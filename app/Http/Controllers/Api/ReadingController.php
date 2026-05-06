@@ -65,24 +65,28 @@ class ReadingController extends Controller
                 $device->update(['last_seen_at' => $now]);
             }
             
-            return response()->json(['status' => 'success']);
+            // Proceed to save an offline marker reading
         }
-
-        // (Validasi Payload Kosong tidak lagi dibutuhkan karena sudah di-handle required_without)
 
         // 3. Normalisasi Waktu (Cegah Duplicate Entry pada menit yang sama)
         $recordedAt = $now->copy()->startOfMinute();
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $device, $now, $recordedAt) {
-            $incomingKwhRaw = $validated['kwh_total'];
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $device, $now, $recordedAt, $isOffline) {
+            $incomingKwhRaw = $validated['kwh_total'] ?? null;
             $currentBaseline = $device->active_baseline_kwh ?? 0;
+
+            // IF OFFLINE: Use last known raw to keep baseline stable
+            if ($isOffline && $incomingKwhRaw === null) {
+                $latest = PowerReadingRaw::where('device_id', $device->id)->orderByDesc('recorded_at')->first();
+                $incomingKwhRaw = $latest ? $latest->meter_kwh_raw : 0;
+            }
 
             // 4. Ambil data mentah terakhir untuk perbandingan logic Auto Reset
             $latestReading = PowerReadingRaw::where('device_id', $device->id)
                                 ->orderByDesc('recorded_at')
                                 ->first();
 
-            if ($latestReading && $latestReading->meter_kwh_raw !== null) {
+            if (!$isOffline && $latestReading && $latestReading->meter_kwh_raw !== null && $incomingKwhRaw !== null) {
                 $previousKwhRaw = (float) $latestReading->meter_kwh_raw;
                 $difference = $previousKwhRaw - $incomingKwhRaw;
                 
@@ -150,10 +154,11 @@ class ReadingController extends Controller
                         'voltage'       => $validated['voltage'] ?? null,
                         'current'       => $validated['current'] ?? null,
                         'power_factor'  => $validated['power_factor'] ?? null,
+                        'is_offline'    => $isOffline,
                     ]
                 ],
                 ['device_id', 'recorded_at'], 
-                ['meter_kwh_raw', 'kwh_total', 'power_kw', 'voltage', 'current', 'power_factor'] 
+                ['meter_kwh_raw', 'kwh_total', 'power_kw', 'voltage', 'current', 'power_factor', 'is_offline'] 
             );
 
             // 6. Update Metadata Device

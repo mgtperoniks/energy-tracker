@@ -704,11 +704,7 @@
                         tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
                         const power = parseFloat(row.power_kw);
                         const timestamp = formatTimestamp(row.recorded_at);
-                        const statusHtml = power > 40
-                            ? '<span class="bg-error-container text-error px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Spike</span>'
-                            : (power <= 0
-                                ? '<span class="bg-surface-container-highest text-outline px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Offline</span>'
-                                : '<span class="bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Optimal</span>');
+                        const statusHtml = row.status_badge;
 
                         tr.innerHTML = `
                             <td class="px-4 py-2 font-mono text-[10px] text-outline">${timestamp}</td>
@@ -725,7 +721,8 @@
                                     data-voltage="${parseFloat(row.voltage).toFixed(1)}"
                                     data-current="${parseFloat(row.current).toFixed(1)}"
                                     data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
-                                    data-kwh="${parseFloat(row.kwh_total).toFixed(2)}">
+                                    data-kwh="${parseFloat(row.kwh_total).toFixed(2)}"
+                                    data-status_badge='${row.status_badge}'>
                                     Detail
                                 </button>
                             </td>
@@ -758,10 +755,7 @@
             document.getElementById('modal-kwh').innerText = data.kwh;
             
             const statusEl = document.getElementById('modal-status');
-            const power = parseFloat(data.power);
-            if (power > 40) statusEl.innerHTML = '<span class="bg-error-container text-error px-2 py-1 rounded text-[8px] font-black uppercase">Spike</span>';
-            else if (power <= 0) statusEl.innerHTML = '<span class="bg-surface-container-highest text-outline px-2 py-1 rounded text-[8px] font-black uppercase">Offline</span>';
-            else statusEl.innerHTML = '<span class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded text-[8px] font-black uppercase">Optimal</span>';
+            statusEl.innerHTML = data.status_badge;
 
             const modal = document.getElementById('details-modal');
             const content = document.getElementById('modal-content');

@@ -49,24 +49,41 @@ class DashboardController extends Controller
         }
 
         $yesterdayUsage = PowerReadingDaily::where('recorded_date', $yesterday)->sum('kwh_usage');
+
+        // 3.B. Cost Calculation
+        $activeRate = \App\Models\ElectricityTariff::getRateForDate($today->toDateString());
+        
+        // Always calculate real-time cost based on the displayed usage to ensure consistency
+        $todayCost = $todayUsage * $activeRate;
+        $isEstimatedCost = $todayDailies->isEmpty();
+        
+        // If aggregate exists, we use it as the source of truth for "Frozen" state but keep the calculation consistent
+        if (!$isEstimatedCost) {
+            $todayCost = $todayDailies->sum('energy_cost');
+            
+            // Audit check: if the stored cost is suspiciously different from usage * rate (e.g. > 5% diff), 
+            // fallback to calculation to prevent misleading "Actual: Rp 1,510" bugs.
+            $expectedCost = $todayUsage * $activeRate;
+            if ($expectedCost > 0 && abs($todayCost - $expectedCost) / $expectedCost > 0.05) {
+                $todayCost = $expectedCost;
+                $isEstimatedCost = true; // Mark as estimated since we overridden the stored value
+            }
+        }
+
+        // 3.C. Monthly Aggregates (Including Today)
         $monthUsage = PowerReadingDaily::whereYear('recorded_date', $today->year)
             ->whereMonth('recorded_date', $today->month)
             ->sum('kwh_usage');
-
-        // 3.B. Cost Calculation
-        $todayCost = $todayDailies->sum('energy_cost');
-        $isEstimatedCost = false;
-        
-        // Fallback cost realtime jika aggregate belum berjalan malam ini
-        if ($todayDailies->isEmpty() && $todayUsage > 0) {
-            $activeRate = \App\Models\ElectricityTariff::getRateForDate($today->toDateString());
-            $todayCost = $todayUsage * $activeRate;
-            $isEstimatedCost = true;
-        }
-
+            
         $monthCost = PowerReadingDaily::whereYear('recorded_date', $today->year)
             ->whereMonth('recorded_date', $today->month)
             ->sum('energy_cost');
+
+        // If today is not yet aggregated into daily table, add today's real-time data to monthly total
+        if ($todayDailies->isEmpty()) {
+            $monthUsage += $todayUsage;
+            $monthCost += $todayCost;
+        }
 
         // 4. System Vitality / Anomaly Summary (Today)
         $todayLogs = PollerLog::where('event_at', '>=', $today)->get();
