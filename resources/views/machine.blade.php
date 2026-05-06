@@ -70,28 +70,54 @@
                     <span class="text-[10px] font-bold text-outline">kWh</span>
                 </div>
             </div>
-            <!-- Lifetime -->
+            <!-- Active Power -->
             <div class="bg-surface-container-lowest p-3 rounded border-b-2 border-secondary-container shadow-sm">
-                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Lifetime</span>
+                <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Current Load</span>
                 <div class="flex items-baseline gap-1">
-                    <span class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($totalEnergy, 1) }}</span>
-                    <span class="text-[10px] font-bold text-outline">kWh</span>
+                    <span class="text-lg font-black tracking-tighter text-on-surface">
+                        @if($currentLoadKw !== null && $currentLoadKw > 0)
+                            {{ number_format($currentLoadKw, 2) }}
+                        @elseif($currentLoadKw === 0)
+                            0.00
+                        @else
+                            <span class="text-outline italic text-sm">N/A</span>
+                        @endif
+                    </span>
+                    <span class="text-[10px] font-bold text-outline">kW</span>
                 </div>
             </div>
             <!-- Voltage -->
             <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
                 <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Voltage</span>
-                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->voltage ?? 0, 1) }} <span class="text-[10px] font-bold text-outline">V</span></div>
+                <div class="text-lg font-black tracking-tighter text-on-surface">
+                    @if($machine->latestReading && $machine->latestReading->voltage !== null)
+                        {{ number_format($machine->latestReading->voltage, 1) }} <span class="text-[10px] font-bold text-outline">V</span>
+                    @else
+                        <span class="text-outline italic text-sm">N/A</span>
+                    @endif
+                </div>
             </div>
             <!-- Current -->
             <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
                 <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Current</span>
-                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->current ?? 0, 1) }} <span class="text-[10px] font-bold text-outline">A</span></div>
+                <div class="text-lg font-black tracking-tighter text-on-surface">
+                    @if($machine->latestReading && $machine->latestReading->current !== null)
+                        {{ number_format($machine->latestReading->current, 1) }} <span class="text-[10px] font-bold text-outline">A</span>
+                    @else
+                        <span class="text-outline italic text-sm">N/A</span>
+                    @endif
+                </div>
             </div>
             <!-- PF -->
             <div class="bg-surface-container-lowest p-3 rounded border-b border-surface-container shadow-sm">
                 <span class="text-[8px] font-black uppercase tracking-wider text-outline block mb-1">Power Factor</span>
-                <div class="text-lg font-black tracking-tighter text-on-surface">{{ number_format($machine->latestReading?->power_factor ?? 0, 2) }}</div>
+                <div class="text-lg font-black tracking-tighter text-on-surface">
+                    @if($machine->latestReading && $machine->latestReading->power_factor !== null)
+                        {{ number_format($machine->latestReading->power_factor, 2) }}
+                    @else
+                        <span class="text-outline italic text-sm">N/A</span>
+                    @endif
+                </div>
             </div>
         </div>
 

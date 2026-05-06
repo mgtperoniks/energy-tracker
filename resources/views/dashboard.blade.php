@@ -41,9 +41,9 @@
                     <span class="text-on-surface-variant font-medium mr-1">Rp</span>
                     <span class="text-3xl font-extrabold tracking-tight text-on-surface">{{ number_format($todayCost ?? 0, 0) }}</span>
                 </div>
-                <div class="flex items-center gap-1 text-tertiary mt-1">
-                    <span class="material-symbols-outlined text-sm">payments</span>
-                    <span class="text-xs font-semibold">@if($isEstimatedCost ?? false) Estimated @else Frozen @endif</span>
+                <div class="flex items-center gap-1 mt-1 @if($systemStatus == 'LIVE') text-secondary @elseif($systemStatus == 'STALE') text-tertiary @else text-outline @endif">
+                    <span class="material-symbols-outlined text-sm">@if($systemStatus == 'LIVE') sync @else cloud_off @endif</span>
+                    <span class="text-xs font-semibold uppercase tracking-widest">{{ $systemStatus }}</span>
                 </div>
             </div>
 
@@ -64,11 +64,17 @@
             <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_24px_40px_-4px_rgba(25,28,30,0.05)] flex flex-col gap-2 border-l-4 border-secondary">
                 <span class="text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Current Load</span>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-extrabold tracking-tight text-on-surface">{{ number_format($currentKw ?? 0, 1) }}</span>
+                    <span class="text-3xl font-extrabold tracking-tight text-on-surface">
+                        @if($currentKw !== null)
+                            {{ number_format($currentKw, 1) }}
+                        @else
+                            <span class="text-outline italic text-xl">N/A</span>
+                        @endif
+                    </span>
                     <span class="text-on-surface-variant font-medium">kW</span>
                 </div>
                 <div class="flex items-center gap-1 text-secondary mt-1">
-                    <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+                    <span class="w-2 h-2 rounded-full bg-secondary @if($systemStatus == 'LIVE') animate-pulse @endif"></span>
                     <span class="text-xs font-semibold">Live Transmission</span>
                 </div>
             </div>
@@ -81,12 +87,12 @@
                 <div class="flex items-center justify-between mb-8">
                     <div>
                         <h3 class="text-lg font-bold tracking-tight text-on-surface leading-none">Power Consumption Trend</h3>
-                        <p class="text-xs text-on-surface-variant mt-1">12-hour aggregate industrial load (kW)</p>
+                        <p class="text-xs text-on-surface-variant mt-1" id="chart-subtitle">12-hour aggregate industrial load (kW)</p>
                     </div>
-                    <div class="flex bg-surface-container-low p-1 rounded-md">
-                        <button class="px-3 py-1 text-xs font-bold bg-white shadow-sm rounded">Live</button>
-                        <button class="px-3 py-1 text-xs font-medium text-on-surface-variant">12H</button>
-                        <button class="px-3 py-1 text-xs font-medium text-on-surface-variant">7D</button>
+                    <div class="flex bg-surface-container-low p-1 rounded-md" id="dashboard-chart-range">
+                        <button class="range-btn px-3 py-1 text-xs font-bold bg-white shadow-sm rounded" data-hours="12">12H</button>
+                        <button class="range-btn px-3 py-1 text-xs font-medium text-on-surface-variant" data-hours="24">24H</button>
+                        <button class="range-btn px-3 py-1 text-xs font-medium text-on-surface-variant" data-hours="168">7D</button>
                     </div>
                 </div>
                 
@@ -99,87 +105,100 @@
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         const ctx = document.getElementById('dashboardChart').getContext('2d');
-                        
-                        const deviceId = {{ $machines->first()?->devices->first()?->id ?? 'null' }};
-                        
-                        if (!deviceId) {
-                            renderEmptyChart();
-                            return;
-                        }
+                        let dashboardChart = null;
 
-                        const end = new Date();
-                        const start = new Date(end.getTime() - 12 * 60 * 60 * 1000);
+                        function fetchChartData(hours) {
+                            const end = new Date();
+                            const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+                            const subtitle = document.getElementById('chart-subtitle');
+                            
+                            if (hours >= 168) {
+                                subtitle.innerText = '7-day facility aggregate trend (Daily Source)';
+                            } else {
+                                subtitle.innerText = hours + '-hour facility load trend (Raw Source)';
+                            }
 
-                        fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
-                            .then(res => res.json())
-                            .then(response => {
-                                const data = response.data || [];
-                                const labels = data.map(item => {
-                                    const d = new Date(item.timestamp);
-                                    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-                                });
-                                const values = data.map(item => item.power_kw !== null ? Number(item.power_kw) : null);
+                            fetch(`/api/charts/facility?start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+                                .then(res => res.json())
+                                .then(response => {
+                                    const data = response.data || [];
+                                    const labels = data.map(item => {
+                                        const d = new Date(item.timestamp);
+                                        if (hours >= 168) return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                                    });
+                                    const values = data.map(item => item.power_kw !== null ? Number(item.power_kw) : null);
 
-                                new Chart(ctx, {
-                                    type: 'line',
-                                    data: {
-                                        labels: labels.length > 0 ? labels : ['00:00', '06:00', '12:00', '18:00'],
-                                        datasets: [{
-                                            label: 'Aggregate Power (kW)',
-                                            data: values.length > 0 ? values : [0, 0, 0, 0],
-                                            fill: true,
-                                            backgroundColor: 'rgba(0, 98, 140, 0.1)',
-                                            borderColor: '#00628c',
-                                            borderWidth: 3,
-                                            pointRadius: 0,
-                                            pointHoverRadius: 4,
-                                            pointBackgroundColor: '#00628c',
-                                            pointBorderColor: '#fff',
-                                            pointBorderWidth: 2,
-                                            tension: 0.4,
-                                            spanGaps: false
-                                        }]
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: {
-                                            legend: { display: false },
-                                            tooltip: {
-                                                backgroundColor: '#191c1e',
-                                                padding: 12,
-                                                cornerRadius: 8,
-                                                titleFont: { size: 12, weight: 'bold' },
-                                                bodyFont: { size: 13 },
-                                                callbacks: {
-                                                    label: (context) => {
-                                                        const val = context.parsed.y;
-                                                        return val !== null ? ` Load: ${val.toFixed(2)} kW` : ` Load: No Data`;
+                                    if (dashboardChart) {
+                                        dashboardChart.destroy();
+                                    }
+
+                                    dashboardChart = new Chart(ctx, {
+                                        type: 'line',
+                                        data: {
+                                            labels: labels.length > 0 ? labels : ['No Data'],
+                                            datasets: [{
+                                                label: 'Power (kW)',
+                                                data: values.length > 0 ? values : [0],
+                                                fill: true,
+                                                backgroundColor: 'rgba(0, 98, 140, 0.1)',
+                                                borderColor: '#00628c',
+                                                borderWidth: 3,
+                                                pointRadius: hours >= 168 ? 4 : 0,
+                                                pointHoverRadius: 6,
+                                                pointBackgroundColor: '#00628c',
+                                                pointBorderColor: '#fff',
+                                                pointBorderWidth: 2,
+                                                tension: 0.4,
+                                                spanGaps: false
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: { display: false },
+                                                tooltip: {
+                                                    backgroundColor: '#191c1e',
+                                                    padding: 12,
+                                                    cornerRadius: 8,
+                                                    callbacks: {
+                                                        label: (context) => ` Load: ${context.parsed.y ? context.parsed.y.toFixed(2) : '0.00'} kW`
                                                     }
                                                 }
-                                            }
-                                        },
-                                        scales: {
-                                            y: {
-                                                beginAtZero: true,
-                                                grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                                                ticks: {
-                                                    font: { size: 10, weight: 'bold' },
-                                                    callback: (value) => value + 'kW'
-                                                }
                                             },
-                                            x: {
-                                                grid: { display: false },
-                                                ticks: { font: { size: 10, weight: 'bold' }, maxTicksLimit: 12 }
+                                            scales: {
+                                                y: {
+                                                    beginAtZero: true,
+                                                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                                                    ticks: { font: { size: 10, weight: 'bold' } }
+                                                },
+                                                x: {
+                                                    grid: { display: false },
+                                                    ticks: { font: { size: 10, weight: 'bold' }, maxTicksLimit: 12 }
+                                                }
                                             }
                                         }
-                                    }
+                                    });
                                 });
-                            })
-                            .catch(err => {
-                                console.error('Error fetching chart data:', err);
-                                renderEmptyChart();
+                        }
+
+                        // Initial Load
+                        fetchChartData(12);
+
+                        // Range Buttons
+                        document.querySelectorAll('.range-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                document.querySelectorAll('.range-btn').forEach(b => {
+                                    b.classList.remove('bg-white', 'shadow-sm', 'font-bold');
+                                    b.classList.add('text-on-surface-variant', 'font-medium');
+                                });
+                                this.classList.add('bg-white', 'shadow-sm', 'font-bold');
+                                this.classList.remove('text-on-surface-variant', 'font-medium');
+                                
+                                fetchChartData(parseInt(this.dataset.hours));
                             });
+                        });
 
                         function renderEmptyChart() {
                             new Chart(ctx, {
@@ -220,10 +239,10 @@
                     <div>
                         <div class="flex justify-between mb-2">
                             <span class="text-xs font-bold text-on-surface-variant">Offline Meters</span>
-                            <span class="text-xs font-bold text-primary">{{ $offlineDevices ?? 0 }} Node</span>
+                            <span class="text-xs font-bold text-primary">{{ $offlineDevicesCount ?? 0 }} Node</span>
                         </div>
                         <div class="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
-                            <div class="h-full bg-primary w-[{{ min(($offlineDevices ?? 0) * 10, 100) }}%] rounded-full"></div>
+                            <div class="h-full bg-primary w-[{{ min(($offlineDevicesCount ?? 0) * 10, 100) }}%] rounded-full"></div>
                         </div>
                     </div>
                 </div>
@@ -274,18 +293,68 @@
                         </thead>
                         <tbody class="divide-y divide-outline-variant/10">
                             @foreach($machines as $machine)
+                            @php
+                                $firstDevice = $machine->devices->first();
+                                $reading = $firstDevice ? $latestReadings->get($firstDevice->id) : null;
+                                
+                                // Forensic-Grade Status Logic
+                                $statusLabel = 'OFFLINE';
+                                $statusClass = 'bg-surface-container-highest text-outline';
+                                
+                                if ($reading) {
+                                    $diff = $reading->recorded_at->diffInMinutes(now());
+                                    
+                                    if ($diff > 15) {
+                                        $statusLabel = 'OFFLINE';
+                                        $statusClass = 'bg-surface-container-highest text-outline';
+                                    } elseif ($diff > 3) {
+                                        $statusLabel = 'STALE';
+                                        $statusClass = 'bg-tertiary-container text-on-tertiary-container';
+                                    } else {
+                                        // LIVE (< 3 min)
+                                        $opStatus = $reading->operational_status;
+                                        $statusLabel = ($opStatus == 'IDLE') ? 'LIVE/IDLE' : 'LIVE/' . $opStatus;
+                                        
+                                        $styles = [
+                                            'IDLE'     => 'bg-secondary-container text-on-secondary-container',
+                                            'STANDBY'  => 'bg-secondary text-white',
+                                            'HEATING'  => 'bg-tertiary text-white',
+                                            'MELTING'  => 'bg-primary text-white',
+                                            'OVERLOAD' => 'bg-error text-white',
+                                            'FAULT'    => 'bg-error text-on-error',
+                                        ];
+                                        $statusClass = $styles[$opStatus] ?? 'bg-primary text-white';
+                                    }
+                                }
+
+                                // kWh Today Calculation
+                                $kwhToday = 0;
+                                if ($machine->todaySummary) {
+                                    $kwhToday = $machine->todaySummary->kwh_usage;
+                                } elseif ($reading) {
+                                    // Fallback: This is a simplification, but for dashboard it's okay
+                                    // In a real audit we'd need the start-of-day reading
+                                    $kwhToday = 0; // or hide if unsure
+                                }
+                            @endphp
                             <tr class="hover:bg-surface-container-low/50 transition-colors">
                                 <td class="px-6 py-5">
                                     <a href="{{ route('monitoring.meters', ['id' => $machine->id]) }}" class="font-bold text-primary hover:underline">{{ $machine->name }}</a>
                                     <div class="text-[10px] text-on-surface-variant font-mono">{{ $machine->code }}</div>
                                 </td>
                                 <td class="px-6 py-5 text-sm text-on-surface-variant">Power Meter Node</td>
-                                <td class="px-6 py-5 font-mono text-sm">{{ number_format($machine->todaySummary->kwh_usage ?? 0, 1) }}</td>
-                                <td class="px-6 py-5">
-                                    {!! $machine->devices->first()?->status_badge ?? '<span class="bg-surface-container-highest text-outline px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">No Device</span>' !!}
+                                <td class="px-6 py-5 font-mono text-sm">
+                                    @if($machine->todaySummary)
+                                        {{ number_format($kwhToday, 1) }}
+                                    @else
+                                        <span class="text-outline italic text-[10px]">Syncing...</span>
+                                    @endif
                                 </td>
-                                <td class="px-6 py-5 text-right text-xs text-on-surface-variant">
-                                    {{ $machine->latestReading ? ($machine->latestReading->recorded_at ? $machine->latestReading->recorded_at->diffForHumans() : 'No Data') : 'No Data' }}
+                                <td class="px-6 py-5">
+                                    <span class="{{ $statusClass }} px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">{{ $statusLabel }}</span>
+                                </td>
+                                <td class="px-6 py-5 text-right text-xs text-on-surface-variant font-mono uppercase tracking-tighter">
+                                    {{ $reading ? $reading->recorded_at->diffForHumans() : 'No Data' }}
                                 </td>
                             </tr>
                             @endforeach

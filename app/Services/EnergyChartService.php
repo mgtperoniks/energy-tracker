@@ -25,19 +25,83 @@ class EnergyChartService
 
         $diffInDays = $start->diffInDays($end);
 
-        // Smart Source Selection
-        // 1. RAW: <= 7 Days
-        if ($diffInDays <= 7) {
+        // Smart Source Selection (Resolution Ladder)
+        // 1. RAW: <= 1 Day (Optimized for 12H/24H Dashboard & Real-time)
+        if ($diffInDays <= 1) {
             return $this->queryRaw($deviceId, $start, $end);
         } 
-        // 2. HOURLY: <= 30 Days
-        elseif ($diffInDays <= 30) {
-            return $this->queryHourly($deviceId, $start, $end);
-        } 
-        // 3. DAILY: > 30 Days (max 180d)
-        else {
+        // 2. DAILY: >= 7 Days (Optimized for weekly trends and long-term history)
+        elseif ($diffInDays >= 7) {
             return $this->queryDaily($deviceId, $start, $end);
+        } 
+        // 3. HOURLY: Middle ground (1-7 days)
+        else {
+            return $this->queryHourly($deviceId, $start, $end);
         }
+    }
+
+    /**
+     * Mengambil data chart agregat untuk seluruh fasilitas.
+     */
+    public function getFacilityChartData(string $startDate, string $endDate): array
+    {
+        $start = Carbon::parse($startDate)->setTimezone(config('app.timezone'));
+        $end = Carbon::parse($endDate)->setTimezone(config('app.timezone'));
+        
+        if ($start->diffInDays($end) > 180) {
+            $start = $end->copy()->subDays(180);
+        }
+
+        $diffInDays = $start->diffInDays($end);
+
+        if ($diffInDays <= 1) {
+            return $this->queryFacilityRaw($start, $end);
+        } 
+        elseif ($diffInDays >= 7) {
+            return $this->queryFacilityDaily($start, $end);
+        } 
+        else {
+            return $this->queryFacilityRaw($start, $end);
+        }
+    }
+
+    private function queryFacilityRaw(Carbon $start, Carbon $end): array
+    {
+        // Group by minute to aggregate concurrent readings from all devices
+        $data = PowerReadingRaw::whereBetween('recorded_at', [$start->toDateTimeString(), $end->toDateTimeString()])
+            ->selectRaw("DATE_FORMAT(recorded_at, '%Y-%m-%d %H:%i:00') as minute_at, SUM(power_kw) as power_kw")
+            ->groupBy('minute_at')
+            ->orderBy('minute_at', 'asc')
+            ->limit(3000)
+            ->get();
+
+        $points = $data->map(function ($item) {
+            return [
+                'timestamp' => Carbon::parse($item->minute_at)->toIso8601String(),
+                'power_kw'  => $item->power_kw !== null ? (float) $item->power_kw : null,
+            ];
+        })->toArray();
+
+        return $this->formatResponse('facility_raw', 'minute', $this->normalizeTimeline($points, $start, $end, 'minute'));
+    }
+
+    private function queryFacilityDaily(Carbon $start, Carbon $end): array
+    {
+        $data = PowerReadingDaily::whereBetween('recorded_date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('recorded_date, SUM(kwh_usage) as kwh_usage, AVG(avg_power_kw) as power_kw')
+            ->groupBy('recorded_date')
+            ->orderBy('recorded_date', 'asc')
+            ->get();
+
+        $points = $data->map(function ($item) {
+            return [
+                'timestamp' => Carbon::parse($item->recorded_date)->startOfDay()->toIso8601String(),
+                'kwh_usage' => $item->kwh_usage !== null ? (float) $item->kwh_usage : null,
+                'power_kw'  => $item->power_kw !== null ? (float) $item->power_kw : null,
+            ];
+        })->toArray();
+
+        return $this->formatResponse('facility_daily', 'daily', $this->normalizeTimeline($points, $start, $end, 'daily'));
     }
 
     private function queryRaw(int $deviceId, Carbon $start, Carbon $end): array
