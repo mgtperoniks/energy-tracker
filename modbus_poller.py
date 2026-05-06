@@ -3,6 +3,9 @@ import requests
 import time
 import os
 import struct
+import math
+import math
+import uuid
 from datetime import datetime
 
 # --- CONFIGURATION (via Environment Variables) ---
@@ -13,6 +16,18 @@ REPORT_AS_SLAVE_ID = int(os.getenv('REPORT_AS_SLAVE_ID', 3))
 LARAVEL_API_URL   = os.getenv('MODBUS_API_URL', 'http://web/api/readings')
 DEVICE_TOKEN      = os.getenv('DEVICE_TOKEN', '') # Required for authentication
 INTERVAL_SECONDS  = int(os.getenv('POLLING_INTERVAL', 600))  # Default 10 minutes
+
+# --- GLOBAL STATE (Local session) ---
+LAST_KWH_READING = None
+LAST_POLL_TIME    = None
+
+# --- VALIDATION CONSTANTS ---
+MAX_KW_CAPACITY = 400.0  # Furnace max load
+GROWTH_THRESHOLD_KWH_PER_MIN = 10.0 # 1.5x max capacity for safety margin
+
+# --- LOGGING UTILS ---
+SESSION_ID = str(uuid.uuid4())[:8]
+LOG_TS = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 # --- REGISTER MAP (PM2200 EasyLogic) ---
@@ -30,24 +45,80 @@ INTERVAL_SECONDS  = int(os.getenv('POLLING_INTERVAL', 600))  # Default 10 minute
 REG_TOTAL_WH  = 3203   # INT64, 4 registers, unit: Wh
 REG_AVG_VOLT  = 3009   # Float32, 2 registers, unit: V
 REG_AVG_AMP   = 3017   # Float32, 2 registers, unit: A
-REG_TOTAL_KW  = 3045   # Float32, 2 registers, unit: kW
+REG_TOTAL_KW  = 3059   # CHANGED TO 3059 based on research (Active Power Total)
 REG_PF        = 3083   # Float32, 2 registers, unit: (dimensionless)
+
+# --- CANDIDATE REGISTERS FOR POWER COMPARISON ---
+# We will read these side-by-side to identify the correct one for furnace load tracking
+POWER_CANDIDATES = {
+    3027: "Active Power Total (Alt 1)",
+    3045: "Current Mapping (Likely Wrong)",
+    3053: "Active Power Total (Alt 2)",
+    3059: "Active Power Total (Standard)",
+    3067: "Active Power Total (Alt 3)"
+}
+
+
+# --- TELEMETRY VALIDATION ---
+def validate_telemetry(data):
+    """
+    Apply defensive validation rules for furnace environment.
+    Low power/current is OK (normal furnace cycle), but technical errors are not.
+    """
+    errors = []
+    
+    # 1. Power Factor Validation
+    if data['power_factor'] is not None and data['power_factor'] > 1.0:
+        errors.append(f"PF > 1 ({data['power_factor']})")
+        data['power_factor'] = 1.0
+        
+    # 2. Voltage Collapse Validation
+    if data['voltage'] is not None and 0 < data['voltage'] < 10:
+        errors.append(f"Unrealistic Voltage ({data['voltage']}V)")
+        data['voltage'] = 0
+        
+    # 3. NaN Check (Handled by sanitize_float, but log here for explicit validation record)
+    if data['power_kw'] is None:
+        # We don't add to errors if it's null, as sanitize_float already logged it
+        pass
+
+    if errors:
+        print(f"[{datetime.now()}] VALIDATION WARNING: {', '.join(errors)}", flush=True)
+    
+    return data
+
+
+# --- SANITIZE FLOAT ---
+def sanitize_float(val, name="Value"):
+    """Replace NaN/Inf with None (null in JSON) and log if invalid."""
+    if val is None:
+        return None
+    if math.isnan(val) or math.isinf(val):
+        print(f"[{datetime.now()}] INVALID {name.upper()} DETECTED (NaN/Inf) → Setting to null", flush=True)
+        return None
+    return val
 
 
 # --- READ FLOAT32 (2 Registers → IEEE 754 Float) ---
-def read_float(client, address, slave):
+def read_float(client, address, slave, debug=False):
     """Read a 32-bit IEEE 754 float from 2 consecutive Modbus registers."""
     try:
         rr = client.read_holding_registers(address=address, count=2, slave=slave)
         if rr.isError():
-            print(f"[{datetime.now()}] MODBUS ERROR at Reg {address}: {rr}", flush=True)
+            print(f"[{LOG_TS()}] MODBUS ERROR at Reg {address}: {rr}", flush=True)
             return None
         raw = rr.registers
+        
         # Big-Endian word order: High word first (ABCD)
-        value = struct.unpack('>f', struct.pack('>HH', raw[0], raw[1]))[0]
+        raw_bytes = struct.pack('>HH', raw[0], raw[1])
+        value = struct.unpack('>f', raw_bytes)[0]
+
+        if debug:
+            print(f"[{LOG_TS()}] DEBUG REG {address}: Raw={raw} | Bytes={raw_bytes.hex()} | Decoded={value}", flush=True)
+
         return value
     except Exception as e:
-        print(f"[{datetime.now()}] EXCEPTION at Reg {address}: {e}", flush=True)
+        print(f"[{LOG_TS()}] EXCEPTION at Reg {address}: {e}", flush=True)
         return None
 
 
@@ -98,19 +169,68 @@ def poll_meter():
         volts = read_float(client, REG_AVG_VOLT,  PHYSICAL_SLAVE_ID)
         pf    = read_float(client, REG_PF,        PHYSICAL_SLAVE_ID)
 
+        # --- CANDIDATE COMPARISON MODE ---
+        print(f"[{datetime.now()}] --- POWER REGISTER COMPARISON ---", flush=True)
+        for addr, desc in POWER_CANDIDATES.items():
+            val = read_float(client, addr, PHYSICAL_SLAVE_ID)
+            status = f"{val:.3f} kW" if val is not None else "ERROR"
+            print(f"  Reg {addr} ({desc}): {status}", flush=True)
+        print(f"[{datetime.now()}] -------------------------------", flush=True)
+
+        # Defensive validation & Sanitization
+        kw_s    = sanitize_float(kw,    "power_kw")
+        amps_s  = sanitize_float(amps,  "current")
+        volts_s = sanitize_float(volts, "voltage")
+        pf_s    = sanitize_float(pf,    "power_factor")
+        kwh_s   = sanitize_float(kwh_total, "energy_kwh")
+
         data = {
             'slave_id':     REPORT_AS_SLAVE_ID,
-            'kwh_total':    round(kwh_total, 3),
-            'power_kw':     round(kw,    3) if kw    is not None else 0,
-            'voltage':      round(volts, 1) if volts is not None else 0,
-            'current':      round(amps,  2) if amps  is not None else 0,
-            'power_factor': round(pf,    3) if pf    is not None else 1.0,
+            'kwh_total':    round(kwh_s, 3) if kwh_s is not None else None,
+            'power_kw':     round(kw_s, 3) if kw_s is not None else None,
+            'voltage':      round(volts_s, 1) if volts_s is not None else 0,
+            'current':      round(amps_s, 2) if amps_s is not None else 0,
+            'power_factor': round(pf_s, 3) if pf_s is not None else 1.0,
         }
 
+        # Apply Furnace-Specific Validation
+        data = validate_telemetry(data)
+
+        # --- PRIMARY PHYSICAL VALIDATION: ENERGY GROWTH ---
+        global LAST_KWH_READING, LAST_POLL_TIME
+        now_ts = time.time()
+        growth_str = "First reading"
+        
+        if LAST_KWH_READING is not None and data['kwh_total'] is not None:
+            growth = data['kwh_total'] - LAST_KWH_READING
+            
+            # Calculate time-adjusted threshold
+            # Default to 1.0 if time diff is zero/negative to avoid division errors
+            elapsed_min = max(0.01, (now_ts - LAST_POLL_TIME) / 60.0) if LAST_POLL_TIME else 1.0
+            threshold = GROWTH_THRESHOLD_KWH_PER_MIN * elapsed_min
+            
+            if growth < 0:
+                print(f"[{LOG_TS()}] WARNING: NEGATIVE ENERGY DELTA DETECTED ({growth:.3f} kWh). Meter reset or corruption suspected.", flush=True)
+                growth_str = f"INVALID: Negative ({growth:.3f})"
+                # Do NOT update baseline for growth calculation to recover from transient errors
+            elif growth > threshold:
+                print(f"[{LOG_TS()}] WARNING: UNREALISTIC ENERGY SPIKE DETECTED ({growth:.3f} kWh in {elapsed_min:.1f} min). Max allowed: {threshold:.1f} kWh.", flush=True)
+                growth_str = f"INVALID: Spike ({growth:.3f})"
+                # Do NOT update baseline
+            else:
+                growth_str = f"+{growth:.3f} kWh since last poll"
+                LAST_KWH_READING = data['kwh_total']
+                LAST_POLL_TIME    = now_ts
+        else:
+            # First reading or null energy
+            if data['kwh_total'] is not None:
+                LAST_KWH_READING = data['kwh_total']
+                LAST_POLL_TIME    = now_ts
+
         print(
-            f"[{datetime.now()}] READ OK → "
-            f"E={kwh_total:.2f} kWh | "
-            f"P={data['power_kw']} kW | "
+            f"[{LOG_TS()}] READ OK → "
+            f"E={data['kwh_total'] if data['kwh_total'] is not None else 'N/A'} kWh ({growth_str}) | "
+            f"P={data['power_kw'] if data['power_kw'] is not None else 'NaN'} kW | "
             f"V={data['voltage']} V | "
             f"I={data['current']} A | "
             f"PF={data['power_factor']}",
@@ -167,20 +287,20 @@ def main():
             if response.status_code == 200:
                 if data:
                     print(
-                        f"[{datetime.now()}] #{poll_count} API OK → "
+                        f"[{LOG_TS()}] #{poll_count} API OK → "
                         f"{payload['kwh_total']} kWh stored",
                         flush=True
                     )
                 else:
-                    print(f"[{datetime.now()}] #{poll_count} OFFLINE reported to API", flush=True)
+                    print(f"[{LOG_TS()}] #{poll_count} OFFLINE reported to API", flush=True)
             else:
                 print(
-                    f"[{datetime.now()}] #{poll_count} API ERROR {response.status_code} → {response.text[:200]}",
+                    f"[{LOG_TS()}] #{poll_count} API ERROR {response.status_code} → {response.text[:200]}",
                     flush=True
                 )
 
         except Exception as e:
-            print(f"[{datetime.now()}] #{poll_count} API FAILED: {e}", flush=True)
+            print(f"[{LOG_TS()}] #{poll_count} API FAILED: {e}", flush=True)
 
         elapsed    = time.time() - start_time
         sleep_time = max(1, INTERVAL_SECONDS - elapsed)
