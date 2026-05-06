@@ -369,9 +369,18 @@
                 this.classList.remove('text-on-surface-variant');
                 
                 currentHours = parseInt(this.dataset.range);
+                
                 // Reset forensic inputs when using quick range
                 startPicker.clear();
                 endPicker.clear();
+                
+                // Reset forensic filter state (Ghost Filter Fix)
+                currentFilters.start = null;
+                currentFilters.end = null;
+
+                // Reload historian global
+                fetchReadings(1);
+
                 fetchAndRender();
             });
         });
@@ -405,7 +414,12 @@
             // Set currentHours for label formatting logic
             currentHours = diffDays * 24;
             
+            // Forensic Mode: Apply filter to both Chart AND Ledger
+            currentFilters.start = start.toISOString();
+            currentFilters.end = end.toISOString();
+            
             fetchAndRender(start, end);
+            fetchReadings(1); // Manually refresh ledger ONLY on Forensic Search
         });
 
         let currentFilters = { start: null, end: null };
@@ -420,13 +434,6 @@
                 end = new Date();
                 start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
             }
-
-            // Sync filters for ledger
-            currentFilters.start = start.toISOString();
-            currentFilters.end = end.toISOString();
-
-            // Refresh ledger
-            fetchReadings(1);
 
             fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(res => res.json())
@@ -798,15 +805,12 @@
                 let end = forensicEnd.value;
 
                 if (!start || !end) {
-                    // If custom range is empty, use the current active quick range (1H, 4H, 12H, etc.)
+                    // Default to 12h historian for forensic export if no range selected
                     const now = new Date();
-                    const startDateObj = new Date(now.getTime() - currentHours * 60 * 60 * 1000);
+                    const startDateObj = new Date(now.getTime() - 12 * 60 * 60 * 1000);
                     
                     start = startDateObj.toISOString().slice(0, 16).replace('T', ' ');
                     end = now.toISOString().slice(0, 16).replace('T', ' ');
-                    
-                    const confirmQuickRange = confirm(`Anda belum memilih custom periode.\nDownload data berdasarkan rentang chart yang aktif (${currentHours} jam terakhir)?`);
-                    if (!confirmQuickRange) return;
                 }
 
                 // Client-side validation for 7 days
