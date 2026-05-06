@@ -49,7 +49,13 @@ class MachineController extends Controller
                     });
 
         if ($startDate && $endDate) {
-            $query->whereBetween('recorded_at', [$startDate, $endDate]);
+            try {
+                $start = \Carbon\Carbon::parse($startDate)->setTimezone(config('app.timezone'));
+                $end = \Carbon\Carbon::parse($endDate)->setTimezone(config('app.timezone'));
+                $query->whereBetween('recorded_at', [$start, $end]);
+            } catch (\Exception $e) {
+                // Fallback if parse fails
+            }
         }
 
         $readings = $query->orderBy('recorded_at', 'desc')

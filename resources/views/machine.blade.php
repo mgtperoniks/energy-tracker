@@ -801,16 +801,18 @@
         if (btnExport) {
             btnExport.addEventListener('click', function() {
                 const machineId = this.dataset.machineId;
-                let start = forensicStart.value;
-                let end = forensicEnd.value;
+                
+                // SOURCE OF TRUTH: Use official forensic state, not raw inputs
+                let start = currentFilters.start;
+                let end = currentFilters.end;
 
                 if (!start || !end) {
-                    // Default to 12h historian for forensic export if no range selected
+                    // Fallback to default 12h only if NO forensic filter is active
                     const now = new Date();
                     const startDateObj = new Date(now.getTime() - 12 * 60 * 60 * 1000);
                     
-                    start = startDateObj.toISOString().slice(0, 16).replace('T', ' ');
-                    end = now.toISOString().slice(0, 16).replace('T', ' ');
+                    start = startDateObj.toISOString();
+                    end = now.toISOString();
                 }
 
                 // Client-side validation for 7 days
@@ -819,7 +821,7 @@
                 const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
 
                 if (diffDays > 7) {
-                    alert('⚠️ PERIODE TERLALU BESAR\n\nBatas maksimal download adalah 7 hari (' + diffDays.toFixed(1) + ' hari terpilih).\n\nSilakan pilih rentang waktu yang lebih pendek untuk menjaga kestabilan sistem.');
+                    alert('⚠️ PERIODE TERLALU BESAR\n\nBatas maksimal download adalah 7 hari.\n\nSilakan pilih rentang waktu yang lebih pendek.');
                     return;
                 }
 
@@ -834,6 +836,7 @@
                 btnExport.disabled = true;
 
                 const exportUrl = `/monitoring/meters/${machineId}/export?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+                console.log('Final Export URL:', exportUrl);
                 window.location.href = exportUrl;
 
                 // Reset button after a delay (since we can't easily detect download completion)

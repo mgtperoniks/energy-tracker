@@ -144,6 +144,11 @@ class MachineDashboardController extends Controller
     }
     public function export(Request $request, $id)
     {
+        \Log::info('EXPORT RANGE REQUEST', [
+            'raw_start' => $request->query('start_date'),
+            'raw_end'   => $request->query('end_date'),
+        ]);
+
         $machine = Machine::with('devices')->findOrFail($id);
         $deviceIds = $machine->devices->pluck('id')->toArray();
 
@@ -151,18 +156,20 @@ class MachineDashboardController extends Controller
             return back()->with('error', 'No meters found for this machine.');
         }
 
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        $rawStart = $request->query('start_date');
+        $rawEnd = $request->query('end_date');
         $isDefaultRange = false;
 
-        if (!$startDate || !$endDate) {
+        if (!$rawStart || !$rawEnd) {
             $endDate = now();
             $startDate = now()->subHours(12);
             $isDefaultRange = true;
         } else {
             try {
-                $startDate = Carbon::parse($startDate);
-                $endDate = Carbon::parse($endDate);
+                // EXPLICIT PARSE - Do not use whereDate
+                // Localize to app timezone to prevent UTC offset truncation
+                $startDate = Carbon::parse($rawStart)->setTimezone(config('app.timezone'));
+                $endDate   = Carbon::parse($rawEnd)->setTimezone(config('app.timezone'));
             } catch (\Exception $e) {
                 return back()->with('error', 'Invalid date format.');
             }
@@ -178,7 +185,13 @@ class MachineDashboardController extends Controller
             ->whereBetween('recorded_at', [$startDate, $endDate])
             ->count();
             
-        \Log::info("Telemetry Export: Machine {$machine->code} (Devices: " . implode(',', $deviceIds) . "), Range: {$startDate} to {$endDate}, Rows: {$count}");
+        \Log::info('EXPORT ROW COUNT', [
+            'machine' => $machine->code,
+            'count'   => $count,
+            'start'   => $startDate->toDateTimeString(),
+            'end'     => $endDate->toDateTimeString(),
+            'default' => $isDefaultRange
+        ]);
 
         if ($count === 0) {
             return back()->with('warning', "Tidak ada data telemetry ditemukan untuk periode {$startDate->format('d M H:i')} s/d {$endDate->format('d M H:i')}.");
