@@ -408,6 +408,8 @@
             fetchAndRender(start, end);
         });
 
+        let currentFilters = { start: null, end: null };
+
         function fetchAndRender(customStart = null, customEnd = null) {
             let start, end;
             
@@ -418,6 +420,13 @@
                 end = new Date();
                 start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
             }
+
+            // Sync filters for ledger
+            currentFilters.start = start.toISOString();
+            currentFilters.end = end.toISOString();
+
+            // Refresh ledger
+            fetchReadings(1);
 
             fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(res => res.json())
@@ -687,7 +696,11 @@
             const totalDisplay = document.getElementById('total-readings-display');
 
             try {
-                const response = await fetch(`/api/machines/${machineId}/readings?page=${page}&limit=15`);
+                let url = `/api/machines/${machineId}/readings?page=${page}&limit=15`;
+                if (currentFilters.start && currentFilters.end) {
+                    url += `&start_date=${encodeURIComponent(currentFilters.start)}&end_date=${encodeURIComponent(currentFilters.end)}`;
+                }
+                const response = await fetch(url);
                 const result = await response.json();
 
                 if (result.status === 'success') {

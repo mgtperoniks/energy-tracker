@@ -12,13 +12,13 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class TelemetryExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
 {
-    protected $deviceId;
+    protected $deviceIds;
     protected $startDate;
     protected $endDate;
 
-    public function __construct($deviceId, $startDate, $endDate)
+    public function __construct($deviceIds, $startDate, $endDate)
     {
-        $this->deviceId = $deviceId;
+        $this->deviceIds = is_array($deviceIds) ? $deviceIds : [$deviceIds];
         $this->startDate = $startDate;
         $this->endDate = $endDate;
     }
@@ -28,7 +28,8 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
     */
     public function collection()
     {
-        return PowerReadingRaw::where('device_id', $this->deviceId)
+        return PowerReadingRaw::with(['device.machine'])
+            ->whereIn('device_id', $this->deviceIds)
             ->whereBetween('recorded_at', [$this->startDate, $this->endDate])
             ->orderBy('recorded_at', 'asc')
             ->get();
@@ -38,11 +39,13 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
     {
         return [
             'Timestamp',
+            'Machine Code',
             'Power (kW)',
             'Voltage (V)',
             'Current (A)',
             'Power Factor',
-            'Total Energy (kWh)'
+            'Total kWh',
+            'Status'
         ];
     }
 
@@ -53,11 +56,13 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
     {
         return [
             $reading->recorded_at ? $reading->recorded_at->format('Y-m-d H:i:s') : '-',
-            number_format((float)($reading->power_kw ?? 0), 2, '.', ''),
-            number_format((float)($reading->voltage ?? 0), 1, '.', ''),
-            number_format((float)($reading->current ?? 0), 1, '.', ''),
-            number_format((float)($reading->power_factor ?? 0), 2, '.', ''),
-            number_format((float)($reading->kwh_total ?? 0), 2, '.', ''),
+            $reading->device->machine->code ?? '-',
+            $reading->power_kw !== null ? round((float)$reading->power_kw, 2) : null,
+            $reading->voltage !== null ? round((float)$reading->voltage, 1) : null,
+            $reading->current !== null ? round((float)$reading->current, 1) : null,
+            $reading->power_factor !== null ? round((float)$reading->power_factor, 2) : null,
+            $reading->kwh_total !== null ? round((float)$reading->kwh_total, 2) : null,
+            $reading->operational_status,
         ];
     }
 

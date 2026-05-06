@@ -145,18 +145,20 @@ class MachineDashboardController extends Controller
     public function export(Request $request, $id)
     {
         $machine = Machine::with('devices')->findOrFail($id);
-        $device = $machine->devices->first();
+        $deviceIds = $machine->devices->pluck('id')->toArray();
 
-        if (!$device) {
-            return back()->with('error', 'No device found for this machine.');
+        if (empty($deviceIds)) {
+            return back()->with('error', 'No meters found for this machine.');
         }
 
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        $isDefaultRange = false;
 
         if (!$startDate || !$endDate) {
             $endDate = now();
-            $startDate = now()->subDays(3);
+            $startDate = now()->subHours(12);
+            $isDefaultRange = true;
         } else {
             try {
                 $startDate = Carbon::parse($startDate);
@@ -171,11 +173,23 @@ class MachineDashboardController extends Controller
             return back()->with('error', 'Batas maksimal download adalah 7 hari per export. Silakan perkecil periode pencarian.');
         }
 
-        $filename = "Telemetry_{$machine->code}_" . $startDate->format('Ymd') . "_" . $endDate->format('Ymd') . ".xlsx";
+        // Log row count for debugging
+        $count = PowerReadingRaw::whereIn('device_id', $deviceIds)
+            ->whereBetween('recorded_at', [$startDate, $endDate])
+            ->count();
+            
+        \Log::info("Telemetry Export: Machine {$machine->code} (Devices: " . implode(',', $deviceIds) . "), Range: {$startDate} to {$endDate}, Rows: {$count}");
+
+        if ($count === 0) {
+            return back()->with('warning', "Tidak ada data telemetry ditemukan untuk periode {$startDate->format('d M H:i')} s/d {$endDate->format('d M H:i')}.");
+        }
+
+        $rangeLabel = $isDefaultRange ? "12h" : $startDate->format('Ymd') . "_" . $endDate->format('Ymd');
+        $filename = "meter_{$machine->code}_telemetry_{$rangeLabel}_" . now()->format('Ymd_Hi') . ".xlsx";
 
         try {
             return \Maatwebsite\Excel\Facades\Excel::download(
-                new TelemetryExport($device->id, $startDate, $endDate),
+                new TelemetryExport($deviceIds, $startDate, $endDate),
                 $filename
             );
         } catch (\Exception $e) {

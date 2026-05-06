@@ -40,12 +40,19 @@ class MachineController extends Controller
     public function readings($id, Request $request)
     {
         $machine = Machine::findOrFail($id);
-        $limit = (int) $request->get('limit', 15); // Show 15 per page
+        $limit = (int) $request->get('limit', 15);
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
 
-        $readings = \App\Models\PowerReadingRaw::whereIn('device_id', function($query) use ($machine) {
+        $query = \App\Models\PowerReadingRaw::whereIn('device_id', function($query) use ($machine) {
                         $query->select('id')->from('devices')->where('machine_id', $machine->id);
-                    })
-                    ->orderBy('recorded_at', 'desc')
+                    });
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('recorded_at', [$startDate, $endDate]);
+        }
+
+        $readings = $query->orderBy('recorded_at', 'desc')
                     ->paginate($limit);
 
         return response()->json([
