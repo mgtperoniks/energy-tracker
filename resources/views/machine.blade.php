@@ -322,7 +322,7 @@
 </div>
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="{{ asset('assets/js/chartjs-plugin-annotation.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
