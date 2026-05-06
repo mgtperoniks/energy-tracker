@@ -43,10 +43,33 @@ LOG_TS = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 #   - Endian    : Big-Endian (ABCD)
 #
 REG_TOTAL_WH  = 3203   # INT64, 4 registers, unit: Wh
-REG_AVG_VOLT  = 3009   # Float32, 2 registers, unit: V
-REG_AVG_AMP   = 3017   # Float32, 2 registers, unit: A
-REG_TOTAL_KW  = 3059   # CHANGED TO 3059 based on research (Active Power Total)
-REG_PF        = 3083   # Float32, 2 registers, unit: (dimensionless)
+REG_AVG_VOLT  = 3025   # CHANGED to 3025 (Voltage L-L Avg) for PM2220
+REG_AVG_AMP   = 3009   # CHANGED to 3009 (Current Average) for PM2220
+REG_TOTAL_KW  = 3059   # Active Power Total
+REG_PF        = 3083   # Power Factor Total
+
+# --- PM2220 HARDWARE CONSTANTS ---
+CT_RATIO = 120.0  # 600/5
+
+# --- CANDIDATE REGISTERS FOR VOLTAGE COMPARISON ---
+VOLTAGE_CANDIDATES = {
+    3009: "Original Mapping (Suspect)",
+    3019: "Voltage L-L A-B",
+    3025: "Voltage L-L Avg (Standard)",
+    3027: "Voltage L-N Avg",
+    3031: "Voltage L-L Avg (Alt)"
+}
+
+# --- CANDIDATE REGISTERS FOR CURRENT COMPARISON ---
+CURRENT_CANDIDATES = {
+    2999: "Current Phase A (Primary Suspect)",
+    3001: "Current Phase B",
+    3003: "Current Phase C",
+    3009: "Current Average (Standard)",
+    3011: "Current Average (Alt)",
+    3017: "Current Unbalance % (Current Config)",
+    3021: "Demand Current"
+}
 
 # --- CANDIDATE REGISTERS FOR POWER COMPARISON ---
 # We will read these side-by-side to identify the correct one for furnace load tracking
@@ -70,12 +93,13 @@ def validate_telemetry(data):
     # 1. Power Factor Validation
     if data['power_factor'] is not None and data['power_factor'] > 1.0:
         errors.append(f"PF > 1 ({data['power_factor']})")
-        data['power_factor'] = 1.0
+        # Do not force to 1.0 if invalid, keep as None to signify missing/invalid
+        data['power_factor'] = None
         
     # 2. Voltage Collapse Validation
     if data['voltage'] is not None and 0 < data['voltage'] < 10:
         errors.append(f"Unrealistic Voltage ({data['voltage']}V)")
-        data['voltage'] = 0
+        data['voltage'] = None
         
     # 3. NaN Check (Handled by sanitize_float, but log here for explicit validation record)
     if data['power_kw'] is None:
@@ -169,13 +193,24 @@ def poll_meter():
         volts = read_float(client, REG_AVG_VOLT,  PHYSICAL_SLAVE_ID)
         pf    = read_float(client, REG_PF,        PHYSICAL_SLAVE_ID)
 
-        # --- CANDIDATE COMPARISON MODE ---
-        print(f"[{datetime.now()}] --- POWER REGISTER COMPARISON ---", flush=True)
-        for addr, desc in POWER_CANDIDATES.items():
+        # --- VOLTAGE REGISTER COMPARISON MODE ---
+        print(f"[{LOG_TS()}] --- VOLTAGE REGISTER COMPARISON ---", flush=True)
+        for addr, desc in VOLTAGE_CANDIDATES.items():
             val = read_float(client, addr, PHYSICAL_SLAVE_ID)
-            status = f"{val:.3f} kW" if val is not None else "ERROR"
+            status = f"{val:.1f} V" if val is not None else "ERROR"
             print(f"  Reg {addr} ({desc}): {status}", flush=True)
-        print(f"[{datetime.now()}] -------------------------------", flush=True)
+        print(f"[{LOG_TS()}] ------------------------------------", flush=True)
+
+        # --- CURRENT REGISTER COMPARISON MODE ---
+        print(f"[{LOG_TS()}] --- CURRENT REGISTER COMPARISON (CT Ratio: {CT_RATIO}) ---", flush=True)
+        for addr, desc in CURRENT_CANDIDATES.items():
+            val = read_float(client, addr, PHYSICAL_SLAVE_ID)
+            if val is not None:
+                scaled = val * CT_RATIO
+                print(f"  Reg {addr} ({desc}): {val:.3f} (Secondary) | {scaled:.1f} A (Scaled Primary)", flush=True)
+            else:
+                print(f"  Reg {addr} ({desc}): ERROR", flush=True)
+        print(f"[{LOG_TS()}] -----------------------------------------------------", flush=True)
 
         # Defensive validation & Sanitization
         kw_s    = sanitize_float(kw,    "power_kw")
@@ -188,9 +223,9 @@ def poll_meter():
             'slave_id':     REPORT_AS_SLAVE_ID,
             'kwh_total':    round(kwh_s, 3) if kwh_s is not None else None,
             'power_kw':     round(kw_s, 3) if kw_s is not None else None,
-            'voltage':      round(volts_s, 1) if volts_s is not None else 0,
-            'current':      round(amps_s, 2) if amps_s is not None else 0,
-            'power_factor': round(pf_s, 3) if pf_s is not None else 1.0,
+            'voltage':      round(volts_s, 1) if volts_s is not None else None,
+            'current':      round(amps_s, 2) if amps_s is not None else None,
+            'power_factor': round(pf_s, 3) if pf_s is not None else None,
         }
 
         # Apply Furnace-Specific Validation
@@ -270,10 +305,10 @@ def main():
         payload = data if data else {
             'slave_id':     REPORT_AS_SLAVE_ID,
             'kwh_total':    None,
-            'power_kw':     0,
-            'voltage':      0,
-            'current':      0,
-            'power_factor': 0,
+            'power_kw':     None,
+            'voltage':      None,
+            'current':      None,
+            'power_factor': None,
             'is_offline':   True,
         }
 
