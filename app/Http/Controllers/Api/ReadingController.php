@@ -143,6 +143,7 @@ class ReadingController extends Controller
             $normalizedKwhTotal = $currentBaseline + $incomingKwhRaw;
 
             // 5. O(1) UPSERT OPERATION 
+            // TODO: Add 'is_offline' to upsert once the column is added to power_readings_raw table
             PowerReadingRaw::upsert(
                 [
                     [
@@ -154,11 +155,10 @@ class ReadingController extends Controller
                         'voltage'       => $validated['voltage'] ?? null,
                         'current'       => $validated['current'] ?? null,
                         'power_factor'  => $validated['power_factor'] ?? null,
-                        'is_offline'    => $isOffline,
                     ]
                 ],
                 ['device_id', 'recorded_at'], 
-                ['meter_kwh_raw', 'kwh_total', 'power_kw', 'voltage', 'current', 'power_factor', 'is_offline'] 
+                ['meter_kwh_raw', 'kwh_total', 'power_kw', 'voltage', 'current', 'power_factor'] 
             );
 
             // 6. Update Metadata Device

@@ -32,10 +32,12 @@ class PowerReadingRaw extends Model
      */
     public function getOperationalStatusAttribute()
     {
-        // OFFLINE: Explicit marker from poller
+        // TODO: Restore OFFLINE check once is_offline column is added to database
+        /*
         if ($this->is_offline) {
             return 'OFFLINE';
         }
+        */
 
         // FAULT: Missing critical telemetry (while supposedly online)
         if ($this->voltage === null || $this->current === null) {
