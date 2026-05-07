@@ -118,7 +118,7 @@
                                 subtitle.innerText = hours + '-hour facility load trend (Raw Source)';
                             }
 
-                            fetch(`/api/charts/facility?start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+                            fetch(`{{ url('api/charts/facility') }}?start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                                 .then(res => res.json())
                                 .then(response => {
                                     const data = response.data || [];

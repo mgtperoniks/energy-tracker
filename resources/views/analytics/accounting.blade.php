@@ -8,10 +8,16 @@
                 <h1 class="text-3xl font-extrabold tracking-tight text-on-surface">Accounting Report</h1>
                 <p class="text-on-surface-variant text-sm mt-1">Laporan estimasi biaya listrik per departemen/mesin.</p>
             </div>
-            <button class="px-4 py-2 bg-surface-container-high text-on-surface font-medium rounded-md hover:bg-surface-container-highest transition-colors flex items-center gap-2">
-                <span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                Export Finance Data
-            </button>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('analytics.accounting.export', request()->all()) }}" class="px-4 py-2 bg-surface-container-high text-on-surface font-medium rounded-md hover:bg-surface-container-highest transition-colors flex items-center gap-2 text-sm">
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    Excel
+                </a>
+                <a href="{{ route('analytics.accounting.pdf', request()->all()) }}" target="_blank" class="px-4 py-2 bg-error-container text-on-error-container font-medium rounded-md hover:bg-error-container/80 transition-colors flex items-center gap-2 text-sm">
+                    <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                    PDF
+                </a>
+            </div>
         </div>
 
         <!-- Filter Area -->

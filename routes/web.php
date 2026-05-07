@@ -26,8 +26,16 @@ Route::middleware('auth')->group(function () {
     Route::prefix('analytics')->name('analytics.')->group(function () {
         Route::get('/operational', [\App\Http\Controllers\ReportController::class, 'operational'])->name('operational');
         Route::get('/operational/export', [\App\Http\Controllers\ReportController::class, 'exportOperational'])->name('operational.export');
+        Route::get('/operational/pdf', [\App\Http\Controllers\ReportController::class, 'exportOperationalPdf'])->name('operational.pdf');
         Route::get('/accounting', [\App\Http\Controllers\ReportController::class, 'accounting'])->name('accounting');
-        Route::get('/audit', [\App\Http\Controllers\ReportController::class, 'audit'])->name('audit');
+        Route::get('/accounting/export', [\App\Http\Controllers\ReportController::class, 'exportAccounting'])->name('accounting.export');
+        Route::get('/accounting/pdf', [\App\Http\Controllers\ReportController::class, 'exportAccountingPdf'])->name('accounting.pdf');
+        Route::get('/audit', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit');
+        Route::post('/audit/{log}/acknowledge', [\App\Http\Controllers\AuditController::class, 'acknowledge'])->name('audit.acknowledge');
+        Route::post('/audit/{log}/resolve', [\App\Http\Controllers\AuditController::class, 'resolve'])->name('audit.resolve');
+        Route::post('/audit/{log}/ignore', [\App\Http\Controllers\AuditController::class, 'ignore'])->name('audit.ignore');
+        Route::post('/audit/{log}/reopen', [\App\Http\Controllers\AuditController::class, 'reopen'])->name('audit.reopen');
+        Route::get('/audit/export', [\App\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
     });
 
     // 4. ASSETS
@@ -51,7 +59,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/deployment-health', [\App\Http\Controllers\AdminController::class, 'deploymentHealth'])->name('deployment-health');
     });
 
-    // API Routes
+    // API / AJAX Routes
+    Route::prefix('api/notifications')->name('api.notifications.')->group(function () {
+        Route::get('/count', [\App\Http\Controllers\NotificationController::class, 'count'])->name('count');
+        Route::get('/latest', [\App\Http\Controllers\NotificationController::class, 'latest'])->name('latest');
+        Route::post('/{id}/read', [\App\Http\Controllers\NotificationController::class, 'read'])->name('read');
+        Route::post('/read-all', [\App\Http\Controllers\NotificationController::class, 'readAll'])->name('read-all');
+    });
+
     Route::get('/api/machines/{id}/readings', [\App\Http\Controllers\Api\MachineController::class, 'readings'])->name('api.machines.readings');
     Route::get('/api/charts/device', [\App\Http\Controllers\Api\ChartController::class, 'getDeviceChart'])->name('api.charts.device');
     Route::get('/api/charts/facility', [\App\Http\Controllers\Api\ChartController::class, 'getFacilityChart'])->name('api.charts.facility');

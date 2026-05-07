@@ -46,12 +46,16 @@ class DetectLowVoltageAnomaly extends Command
                     ->exists();
 
                 if (!$existingWarning) {
-                    PollerLog::create([
-                        'device_id' => $device->id,
-                        'status'    => PollerLog::STATUS_WARNING,
-                        'message'   => $warningMessage,
-                        'event_at'  => Carbon::now()
-                    ]);
+                    app(\App\Services\AuditService::class)->logEvent(
+                        $device->id,
+                        'LOW_VOLTAGE',
+                        'POWER_QUALITY',
+                        \App\Models\AuditLog::SEVERITY_WARNING,
+                        'Low Voltage Operation',
+                        $warningMessage,
+                        ['avg_v' => $vRounded, 'avg_p' => $pRounded],
+                        'aggregation'
+                    );
                     $anomaliesCount++;
                 }
             }

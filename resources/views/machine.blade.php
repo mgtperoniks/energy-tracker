@@ -461,7 +461,7 @@
                 start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
             }
 
-            fetch(`/api/charts/device?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+            fetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(res => res.json())
                 .then(response => {
                     const data = response.data || [];
@@ -729,7 +729,7 @@
             const totalDisplay = document.getElementById('total-readings-display');
 
             try {
-                let url = `/api/machines/${machineId}/readings?page=${page}&limit=15`;
+                let url = `{{ url('api/machines') }}/${machineId}/readings?page=${page}&limit=15`;
                 if (currentFilters.start && currentFilters.end) {
                     url += `&start_date=${encodeURIComponent(currentFilters.start)}&end_date=${encodeURIComponent(currentFilters.end)}`;
                 }

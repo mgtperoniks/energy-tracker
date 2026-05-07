@@ -53,6 +53,10 @@ Schedule::command('health:detect-idle-consumption')
     ->withoutOverlapping()
     ->onSuccess(fn () => \Illuminate\Support\Facades\Cache::forever('cron_detect_idle_consumption', now()));
 
+Schedule::command('audit:check-escalations')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // --- ADMINISTRATION JOBS ---
 
 // Sinkronisasi status tarif listrik (UI Helper)

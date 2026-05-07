@@ -9,7 +9,9 @@ use App\Models\MeterReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Exports\OperationalReportExport;
+use App\Exports\AccountingReportExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -24,6 +26,11 @@ class ReportController extends Controller
         $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
 
         $reports = $query->paginate(50)->withQueryString();
+
+        // Live Hydration
+        $reports->getCollection()->transform(function($report) {
+            return $report->hydrateLive();
+        });
 
         return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate'));
     }
@@ -44,6 +51,32 @@ class ReportController extends Controller
         );
     }
 
+    public function exportOperationalPdf(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+
+        $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
+        $reports = $query->get();
+
+        // Apply live hydration for current day records
+        foreach ($reports as $report) {
+            $report->hydrateLive();
+        }
+
+        $deviceName = 'All Devices';
+        if ($deviceId) {
+            $device = \App\Models\Device::find($deviceId);
+            $deviceName = $device ? $device->name : 'All Devices';
+        }
+
+        $pdf = Pdf::loadView('exports.operational_pdf', compact('reports', 'startDate', 'endDate', 'deviceName'))
+                  ->setPaper('a4', 'portrait');
+
+        return $pdf->stream('energy_operational_report_' . now()->format('Ymd_Hi') . '.pdf');
+    }
+
     private function buildOperationalQuery($startDate, $endDate, $deviceId = null)
     {
         $query = PowerReadingDaily::with('device.machine')
@@ -55,6 +88,7 @@ class ReportController extends Controller
 
         return $query->orderBy('recorded_date', 'desc');
     }
+
 
     public function accounting(Request $request)
     {
@@ -77,7 +111,15 @@ class ReportController extends Controller
         $rankingQuery = clone $baseQuery;
 
         $reports = $reportsQuery->orderBy('recorded_date', 'desc')->paginate(50);
-        $totalCost = $costQuery->sum('energy_cost');
+        
+        // Live Hydration for list
+        $reports->getCollection()->transform(function($report) {
+            return $report->hydrateLive();
+        });
+
+        $totalCost = $costQuery->get()->sum(function($item) {
+            return $item->hydrateLive()->energy_cost;
+        });
         
         // Top device cost ranking
         $topDevices = $rankingQuery->select('device_id', DB::raw('SUM(energy_cost) as total_device_cost'))
@@ -88,6 +130,61 @@ class ReportController extends Controller
             ->get();
 
         return view('analytics.accounting', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate', 'totalCost', 'topDevices'));
+    }
+
+    public function exportAccounting(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+
+        $query = PowerReadingDaily::with('device.machine')
+            ->whereBetween('recorded_date', [$startDate, $endDate]);
+
+        if ($deviceId) {
+            $query->where('device_id', $deviceId);
+        }
+
+        $filename = 'energy_accounting_report_' . now()->format('Ymd_Hi') . '.xlsx';
+
+        return Excel::download(
+            new AccountingReportExport($query->orderBy('recorded_date', 'desc')), 
+            $filename
+        );
+    }
+
+    public function exportAccountingPdf(Request $request)
+    {
+        $deviceId = $request->query('device_id');
+        $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
+        $endDate = $request->query('end_date', now()->toDateString());
+
+        $query = PowerReadingDaily::with('device.machine')
+            ->whereBetween('recorded_date', [$startDate, $endDate]);
+
+        if ($deviceId) {
+            $query->where('device_id', $deviceId);
+        }
+
+        $reports = $query->orderBy('recorded_date', 'desc')->get();
+        
+        // Live Hydration for accuracy
+        foreach ($reports as $report) {
+            $report->hydrateLive();
+        }
+
+        $totalCost = $reports->sum('energy_cost');
+
+        $deviceName = 'All Devices';
+        if ($deviceId) {
+            $device = \App\Models\Device::find($deviceId);
+            $deviceName = $device ? $device->name : 'All Devices';
+        }
+
+        $pdf = Pdf::loadView('exports.accounting_pdf', compact('reports', 'startDate', 'endDate', 'deviceName', 'totalCost'))
+                  ->setPaper('a4', 'portrait');
+
+        return $pdf->stream('energy_accounting_report_' . now()->format('Ymd_Hi') . '.pdf');
     }
 
     public function audit(Request $request)

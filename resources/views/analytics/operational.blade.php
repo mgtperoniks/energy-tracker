@@ -36,7 +36,11 @@
                     </button>
                     <a href="{{ route('analytics.operational.export', request()->all()) }}" class="px-6 py-2 bg-surface-container-high text-on-surface font-bold rounded-md hover:bg-surface-container-highest transition-colors h-[38px] flex items-center justify-center gap-2">
                         <span class="material-symbols-outlined text-sm">download</span>
-                        Export Excel
+                        Excel
+                    </a>
+                    <a href="{{ route('analytics.operational.pdf', request()->all()) }}" target="_blank" class="px-6 py-2 bg-error-container text-on-error-container font-bold rounded-md hover:bg-error-container/80 transition-colors h-[38px] flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                        PDF
                     </a>
                 </div>
             </form>

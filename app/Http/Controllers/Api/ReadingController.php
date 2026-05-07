@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\PowerReadingRaw;
 use App\Models\PollerLog;
+use App\Models\AuditLog;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 
 class ReadingController extends Controller
@@ -119,22 +121,30 @@ class ReadingController extends Controller
                             ]
                         );
 
-                        PollerLog::create([
-                            'device_id' => $device->id,
-                            'status'    => PollerLog::STATUS_WARNING,
-                            'message'   => 'Meter hardware reset/overflow detected automatically.',
-                            'event_at'  => $now
-                        ]);
+                        app(AuditService::class)->logEvent(
+                            $device->id,
+                            'DEVICE_RESTART',
+                            'DEVICE_EVENT',
+                            AuditLog::SEVERITY_WARNING,
+                            'Meter Hardware Reset',
+                            'Meter hardware reset/overflow detected automatically.',
+                            ['previous_raw' => $previousKwhRaw, 'new_raw' => $incomingKwhRaw],
+                            'api'
+                        );
 
                         $currentBaseline = $newBaseline;
                     } else {
                         // Anomaly Guard: Drop terdeteksi tapi angka baru terlalu tinggi (corrupted packet)
-                        PollerLog::create([
-                            'device_id' => $device->id,
-                            'status'    => PollerLog::STATUS_ERROR,
-                            'message'   => 'Corrupted modbus packet anomaly. Invalid drop with large incoming raw: ' . $incomingKwhRaw . ' kWh',
-                            'event_at'  => $now
-                        ]);
+                        app(AuditService::class)->logEvent(
+                            $device->id,
+                            'DATA_CORRUPTION',
+                            'DATA_ANOMALY',
+                            AuditLog::SEVERITY_ERROR,
+                            'Corrupted Modbus Packet',
+                            'Corrupted modbus packet anomaly. Invalid drop with large incoming raw: ' . $incomingKwhRaw . ' kWh',
+                            ['incoming_raw' => $incomingKwhRaw, 'previous_raw' => $previousKwhRaw],
+                            'api'
+                        );
                         // Baseline tidak di-update, tetap gunakan logic UPSERT normal
                     }
                 }

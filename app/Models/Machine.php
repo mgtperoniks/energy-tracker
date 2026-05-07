@@ -49,8 +49,16 @@ class Machine extends Model
 
     public function todaySummary()
     {
-        return $this->hasOne(DailyEnergySummary::class)
-            ->whereDate('date', today());
+        // Use hasOneThrough to get the daily summary from the first associated device
+        // This is a simplified approach for the ledger view
+        return $this->hasOneThrough(
+            PowerReadingDaily::class,
+            Device::class,
+            'machine_id',
+            'device_id',
+            'id',
+            'id'
+        )->where('recorded_date', today());
     }
 
     public function recentReadings()

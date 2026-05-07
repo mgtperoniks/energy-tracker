@@ -115,10 +115,29 @@
             </div>
             <input class="bg-white/10 border-none text-white text-sm rounded-md pl-10 pr-4 py-2 w-48 lg:w-64 focus:ring-1 focus:ring-white/30 placeholder-sky-100/50 outline-none" placeholder="Global Search..." type="text"/>
         </div>
-        <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 flex relative" title="Notifications">
-            <span class="material-symbols-outlined text-white" data-icon="notifications">notifications</span>
-            <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-sky-800"></span>
-        </button>
+        <!-- NOTIFICATION BELL -->
+        <div class="relative flex items-center" id="notification-root">
+            <button onclick="toggleNotificationDropdown()" class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 flex relative" title="Notifications">
+                <span class="material-symbols-outlined text-white">notifications</span>
+                <span id="notif-badge" class="hidden absolute top-2 right-2 w-4 h-4 bg-red-600 text-[9px] font-black flex items-center justify-center rounded-full border border-sky-800">0</span>
+            </button>
+            
+            <!-- DROPDOWN PANEL -->
+            <div id="notif-dropdown" class="hidden absolute right-0 top-12 w-80 bg-surface-container-lowest rounded-xl shadow-2xl border border-outline/10 overflow-hidden text-on-surface z-[100]">
+                <div class="px-4 py-3 bg-surface-container-low border-b border-outline/10 flex justify-between items-center">
+                    <span class="text-xs font-black uppercase tracking-widest">Notifications</span>
+                    <button onclick="markAllAsRead()" class="text-[10px] font-bold text-primary hover:underline">Mark all as read</button>
+                </div>
+                
+                <div id="notif-items" class="max-h-96 overflow-y-auto custom-scrollbar">
+                    <div class="px-6 py-10 text-center text-outline italic text-xs">Loading...</div>
+                </div>
+                
+                <div class="bg-surface-container-low p-2 text-center border-t border-outline/10">
+                    <a href="{{ route('analytics.audit') }}" class="text-[10px] font-bold text-outline hover:text-primary transition-colors uppercase tracking-widest">View All Audit Logs</a>
+                </div>
+            </div>
+        </div>
         <button class="p-2 hover:bg-white/10 rounded-full transition-colors active:opacity-80 hidden md:flex" title="Settings">
             <span class="material-symbols-outlined text-white" data-icon="settings">settings</span>
         </button>
@@ -295,5 +314,71 @@
     </a>
 </nav>
 
+<script>
+    function toggleNotificationDropdown() {
+        const dd = document.getElementById('notif-dropdown');
+        dd.classList.toggle('hidden');
+        if (!dd.classList.contains('hidden')) {
+            loadNotifications();
+        }
+    }
+
+    function loadNotifications() {
+        fetch("{{ route('api.notifications.latest') }}")
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('notif-items').innerHTML = data.html;
+                updateBadge(data.count);
+            });
+    }
+
+    function updateBadge(count) {
+        const badge = document.getElementById('notif-badge');
+        if (count > 0) {
+            badge.innerText = count > 9 ? '9+' : count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    function markReadAndGo(id, url) {
+        fetch(`/api/notifications/${id}/read`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+        }).then(() => {
+            window.location.href = url;
+        });
+    }
+
+    function markAllAsRead() {
+        fetch("{{ route('api.notifications.read-all') }}", {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+        }).then(() => {
+            loadNotifications();
+            updateBadge(0);
+        });
+    }
+
+    // Polling Unread Count every 30s
+    setInterval(() => {
+        fetch("{{ route('api.notifications.count') }}")
+            .then(res => res.json())
+            .then(data => updateBadge(data.count));
+    }, 30000);
+
+    // Initial check
+    fetch("{{ route('api.notifications.count') }}")
+        .then(res => res.json())
+        .then(data => updateBadge(data.count));
+
+    // Close dropdown on click outside
+    window.addEventListener('click', function(e) {
+        if (!document.getElementById('notification-root').contains(e.target)) {
+            document.getElementById('notif-dropdown').classList.add('hidden');
+        }
+    });
+</script>
 </body>
 </html>
