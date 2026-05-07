@@ -49,7 +49,7 @@ class PowerReadingRaw extends Model
         if ($power < 3) return 'IDLE';
         if ($power < 30) return 'STANDBY';
         if ($power < 250) return 'HEATING';
-        if ($power <= 420) return 'MELTING';
+        if ($power <= 450) return 'MELTING';
         
         return 'OVERLOAD';
     }
