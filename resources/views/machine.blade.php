@@ -327,7 +327,7 @@
                             <th class="px-4 py-2 text-right">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="text-[11px]">
+                    <tbody class="text-[11px]" id="telemetry-tbody">
                         <tr>
                             <td colspan="8" class="px-4 py-10 text-center text-outline italic">Loading telemetry stream...</td>
                         </tr>
@@ -590,7 +590,8 @@
         }
 
         function renderChart(data) {
-            if (chartInstance) chartInstance.destroy();
+            try {
+                if (chartInstance) chartInstance.destroy();
             
             if (data.length === 0) {
                 renderEmptyChart();
@@ -802,6 +803,7 @@
                             max: 600
                         },
                         x: { 
+                            type: 'category',
                             grid: { display: false }, 
                             ticks: { 
                                 font: { size: 9 }, 
@@ -822,19 +824,30 @@
                     interaction: { intersect: false }
                 }
             });
+        } catch (error) {
+            console.error('Fatal Chart.js Error:', error);
+            renderEmptyChart();
         }
+    }
 
         function renderEmptyChart() {
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, { type: 'line', data: { labels: ['No Data'], datasets: [] }, options: { maintainAspectRatio: false } });
         }
 
-        fetchAndRender();
-
-        // Telemetry Logic
+        // Telemetry Global State
         let currentPage = 1;
         let lastPage = 1;
         const machineId = "{{ $machine->id }}";
+
+        try {
+            fetchAndRender();
+        } catch (e) { console.error('Initial Chart Load Failed:', e); }
+
+        // Telemetry Logic (Isolated)
+        try {
+            fetchReadings(1);
+        } catch (e) { console.error('Initial Telemetry Load Failed:', e); }
         
         function formatTimestamp(isoString) {
             const d = new Date(isoString);
@@ -848,7 +861,7 @@
         }
 
         async function fetchReadings(page = 1) {
-            const tbody = document.querySelector('tbody');
+            const tbody = document.getElementById('telemetry-tbody');
             const nextBtn = document.getElementById('next-page');
             const prevBtn = document.getElementById('prev-page');
             const pageDisplay = document.getElementById('current-page-display');
@@ -861,15 +874,20 @@
                     url += `&start_date=${encodeURIComponent(currentFilters.start)}&end_date=${encodeURIComponent(currentFilters.end)}`;
                 }
                 const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
                 const result = await response.json();
 
                 if (result.status === 'success') {
                     const paginator = result.data;
                     const readings = paginator.data;
-                    tbody.innerHTML = '';
                     
-                    if (readings.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-outline italic">No telemetry data.</td></tr>';
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        
+                        if (readings.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-outline italic">No telemetry data.</td></tr>';
+                        }
                     }
 
                     readings.forEach(row => {
@@ -911,12 +929,15 @@
                     prevBtn.disabled = currentPage <= 1;
                     nextBtn.disabled = currentPage >= lastPage;
                 }
-            } catch (error) { console.error('Error fetching readings:', error); }
+            } catch (error) { 
+                console.error('Error fetching readings:', error);
+                const tbody = document.getElementById('telemetry-tbody');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-error italic">Failed to load telemetry stream.</td></tr>';
+            }
         }
 
         document.getElementById('next-page').addEventListener('click', () => { if (currentPage < lastPage) fetchReadings(currentPage + 1); });
         document.getElementById('prev-page').addEventListener('click', () => { if (currentPage > 1) fetchReadings(currentPage - 1); });
-        fetchReadings(1);
 
         // Modal Logic
         window.openModal = function(data) {
@@ -1133,40 +1154,72 @@
         }
 
         function drawCycleAnnotations(data) {
-            if (!chartInstance) return;
+            try {
+                if (!chartInstance) return;
 
-            // Get existing annotations
-            const currentAnnotations = chartInstance.options.plugins.annotation.annotations;
-            
-            // Clear previous cycle annotations
-            Object.keys(currentAnnotations).forEach(key => {
-                if (key.startsWith('cycle_')) delete currentAnnotations[key];
-            });
-            
-            data.cycles.forEach(c => {
-                const cycleKey = `cycle_${c.cycle_number}`;
+                // Get existing annotations safely
+                const currentAnnotations = chartInstance.options.plugins.annotation.annotations || {};
                 
-                currentAnnotations[cycleKey] = {
-                    type: 'box',
-                    xMin: c.start_time,
-                    xMax: c.end_time,
-                    yMin: 0,
-                    yMax: c.peak_kw,
-                    backgroundColor: c.abnormal ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                    borderColor: c.abnormal ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)',
-                    borderWidth: 1,
-                    label: {
-                        display: true,
-                        content: [`#${c.cycle_number}`, `${c.duration_minutes}m`],
-                        position: 'start',
-                        color: c.abnormal ? '#ef4444' : '#10b981',
-                        font: { size: 9, weight: 'bold' },
-                        padding: 4
-                    }
-                };
-            });
+                // Clear previous cycle annotations
+                Object.keys(currentAnnotations).forEach(key => {
+                    if (key.startsWith('cycle_')) delete currentAnnotations[key];
+                });
+                
+                const labels = chartInstance.data.labels;
 
-            chartInstance.update();
+                data.cycles.forEach(c => {
+                    const cycleKey = `cycle_${c.cycle_number}`;
+                    
+                    // Robust Mapping: Find index by proximity or exact match
+                    const findClosestIndex = (targetIso) => {
+                        const targetTime = new Date(targetIso).getTime();
+                        let closestIdx = -1;
+                        let minDiff = Infinity;
+                        
+                        for (let i = 0; i < labels.length; i++) {
+                            const labelTime = new Date(labels[i]).getTime();
+                            const diff = Math.abs(labelTime - targetTime);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closestIdx = i;
+                            }
+                        }
+                        // Only match if within 15 minutes (telemetry window)
+                        return minDiff < 900000 ? labels[closestIdx] : null;
+                    };
+
+                    const xMinVal = findClosestIndex(c.start_time);
+                    const xMaxVal = findClosestIndex(c.end_time);
+
+                    if (xMinVal && xMaxVal) {
+                        currentAnnotations[cycleKey] = {
+                            type: 'box',
+                            xMin: xMinVal,
+                            xMax: xMaxVal,
+                            yMin: 0,
+                            yMax: c.peak_kw,
+                            backgroundColor: c.abnormal ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            borderColor: c.abnormal ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)',
+                            borderWidth: 1,
+                            label: {
+                                display: true,
+                                content: [`#${c.cycle_number}`, `${c.duration_minutes}m`],
+                                position: 'start',
+                                color: c.abnormal ? '#ef4444' : '#10b981',
+                                font: { size: 9, weight: 'bold' },
+                                padding: 4
+                            }
+                        };
+                    } else {
+                        console.warn(`Cycle #${c.cycle_number} out of chart range:`, c.start_time);
+                    }
+                });
+
+                chartInstance.options.plugins.annotation.annotations = currentAnnotations;
+                chartInstance.update();
+            } catch (error) {
+                console.error('Cycle Annotation Error:', error);
+            }
         }
 
         window.openCycleDetail = function(index) {
