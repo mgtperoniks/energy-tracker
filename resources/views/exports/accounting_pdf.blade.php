@@ -122,7 +122,9 @@
                 <th>Date</th>
                 <th>Device Name</th>
                 <th class="text-right">Usage (kWh)</th>
+                <th class="text-right">Rate (IDR)</th>
                 <th class="text-right">Amount (IDR)</th>
+                <th class="text-center">Source</th>
             </tr>
         </thead>
         <tbody>
@@ -133,7 +135,13 @@
                     <td class="font-bold">{{ \Carbon\Carbon::parse($row->recorded_date)->format('d/m/Y') }}</td>
                     <td>{{ $row->device->name }}</td>
                     <td class="text-right">{{ number_format($row->kwh_usage, 2) }}</td>
+                    <td class="text-right" style="font-size: 9px; color: #666;">{{ number_format($row->applied_rate, 2) }}</td>
                     <td class="text-right font-bold">Rp {{ number_format($row->energy_cost, 0) }}</td>
+                    <td class="text-center">
+                        <span style="font-size: 8px; padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px; background: #f5f5f5; color: #666; font-weight: bold;">
+                            {{ strtoupper($row->data_source ?? 'LIVE') }}
+                        </span>
+                    </td>
                 </tr>
             @endforeach
         </tbody>

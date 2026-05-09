@@ -140,6 +140,11 @@
                         <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
                     </div>
 
+                    <button id="btn-analyze-cycles" class="px-3 py-1 bg-secondary text-on-secondary text-[9px] font-black rounded hover:brightness-110 transition-all flex items-center gap-1.5 uppercase tracking-widest">
+                        <span class="material-symbols-outlined text-sm">analytics</span>
+                        Analyze Cycles
+                    </button>
+
                     <!-- Custom Range / Forensic UI -->
                     <div class="flex items-center gap-1.5 border-l border-surface-container pl-2 ml-1" id="forensic-filter">
                         <div class="flex flex-col">
@@ -158,6 +163,117 @@
             </div>
             <div class="h-[330px] w-full">
                 <canvas id="powerChart"></canvas>
+            </div>
+
+            <!-- CYCLE ANALYTICS LEDGER -->
+            <div id="cycle-analyzer-section" class="mt-6 pt-6 border-t border-surface-container-low hidden animate-in slide-in-from-top duration-500">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-secondary flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">cycle</span>
+                        Detected Operational Cycles
+                    </h4>
+                    <div id="cycle-summary-chips" class="flex gap-2">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded border border-surface-container-low">
+                    <table class="w-full text-left text-[10px]" id="cycle-table">
+                        <thead>
+                            <tr class="bg-surface-container-low font-black text-on-surface-variant uppercase tracking-tighter">
+                                <th class="px-4 py-2 text-center">No</th>
+                                <th class="px-4 py-2">Start / End</th>
+                                <th class="px-4 py-2 text-right">Duration</th>
+                                <th class="px-4 py-2 text-right">Peak (kW)</th>
+                                <th class="px-4 py-2 text-right">Avg (kW)</th>
+                                <th class="px-4 py-2 text-right">Energy (kWh)</th>
+                                <th class="px-4 py-2 text-right">Idle Gap</th>
+                                <th class="px-4 py-2 text-right text-error">Waste kW</th>
+                                <th class="px-4 py-2 text-right">Z-Score</th>
+                                <th class="px-4 py-2 text-center">Suspicion</th>
+                                <th class="px-4 py-2 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-surface-container-low bg-white">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- CYCLE DETAIL MODAL -->
+        <div id="cycle-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <div class="bg-white w-full max-w-md rounded-lg shadow-2xl border border-surface-container overflow-hidden">
+                <div class="px-6 py-4 bg-secondary text-on-secondary flex justify-between items-center">
+                    <div>
+                        <h3 class="text-xs font-black uppercase tracking-widest" id="cycle-modal-title">Cycle Detail</h3>
+                        <p class="text-[9px] opacity-80" id="cycle-modal-subtitle"></p>
+                    </div>
+                    <button onclick="closeCycleModal()" class="hover:bg-white/10 p-1 rounded-full transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="p-3 bg-surface-container-low rounded">
+                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Duration</span>
+                            <div class="text-xl font-black text-on-surface" id="cycle-detail-duration"></div>
+                        </div>
+                        <div class="p-3 bg-primary-container/20 rounded">
+                            <span class="text-[8px] font-black text-primary uppercase tracking-widest block mb-1">Total Energy</span>
+                            <div class="text-xl font-black text-primary" id="cycle-detail-energy"></div>
+                        </div>
+                        <div>
+                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Average Power</span>
+                            <div class="text-base font-bold text-on-surface" id="cycle-detail-avg"></div>
+                        </div>
+                        <div>
+                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Peak Power</span>
+                            <div class="text-base font-bold text-on-surface" id="cycle-detail-peak"></div>
+                        </div>
+                        <div>
+                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Idle Gap (Before)</span>
+                            <div class="text-base font-bold text-outline" id="cycle-detail-gap"></div>
+                        </div>
+                        <div class="p-3 bg-tertiary-container/10 rounded border border-tertiary/10">
+                            <span class="text-[8px] font-black text-tertiary uppercase tracking-widest block mb-1">Estimated Energy Cost</span>
+                            <div class="text-xl font-black text-tertiary" id="cycle-detail-cost"></div>
+                        </div>
+                        <div class="p-3 bg-error-container/5 rounded border border-error/10">
+                            <span class="text-[8px] font-black text-error uppercase tracking-widest block mb-1">Idle Cost Leakage</span>
+                            <div class="text-xl font-black text-error" id="cycle-detail-idle-cost"></div>
+                        </div>
+                        <div class="p-3 bg-error-container/10 rounded col-span-2 border border-error/10">
+                            <span class="text-[8px] font-black text-error uppercase tracking-widest block mb-1">Audit Metadata</span>
+                            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                                <div class="text-outline">Threshold Source: <span class="font-bold text-on-surface" id="cycle-modal-thresh-source"></span></div>
+                                <div class="text-outline">Z-Score: <span class="font-bold text-on-surface" id="cycle-modal-zscore"></span></div>
+                                <div class="text-outline">Standby Baseline: <span class="font-bold text-on-surface" id="cycle-modal-standby"></span> kW</div>
+                                <div class="text-outline text-error">Waste Power: <span class="font-bold text-error" id="cycle-modal-waste"></span> kW</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="cycle-suspicion-banner" class="mb-4 p-3 rounded flex items-center justify-between border">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-lg" id="suspicion-icon">report</span>
+                            <div>
+                                <p class="text-[10px] font-black uppercase">Suspicion Audit: <span id="suspicion-label"></span></p>
+                                <p class="text-[9px] opacity-80">Security classification for forensic investigation.</p>
+                            </div>
+                        </div>
+                        <div class="text-xl font-black" id="suspicion-score-val"></div>
+                    </div>
+                    <div id="cycle-anomaly-warning" class="hidden p-3 bg-error-container text-error rounded flex items-start gap-3 border border-error/20">
+                        <span class="material-symbols-outlined text-lg">warning</span>
+                        <div>
+                            <p class="text-[10px] font-black uppercase">Anomaly Detected</p>
+                            <p class="text-[11px] font-medium leading-tight mt-0.5">Cycle duration is significantly above average. Potential operational inefficiency.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-surface-container-low border-t border-surface-container">
+                    <button onclick="closeCycleModal()" class="w-full py-2.5 bg-secondary text-on-secondary font-black rounded text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-md">Close Drilldown</button>
+                </div>
             </div>
         </div>
 
@@ -494,13 +610,7 @@
                 item.voltage !== null ? Number(item.voltage) : null
             );
 
-            const labels = data.map(item => {
-                const d = new Date(item.timestamp);
-                if (currentHours > 24) {
-                    return d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0');
-                }
-                return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-            });
+            const labels = data.map(item => item.timestamp);
 
             let datasets = [];
             let unit = '';
@@ -593,8 +703,8 @@
                     if (downtimeStart !== -1) {
                         chartAnnotations['downtime_' + regionCount++] = {
                             type: 'box',
-                            xMin: downtimeStart - 0.5,
-                            xMax: idx - 0.5,
+                            xMin: labels[downtimeStart],
+                            xMax: labels[idx],
                             backgroundColor: 'rgba(150, 150, 150, 0.12)',
                             borderWidth: 0
                         };
@@ -606,8 +716,8 @@
             if (downtimeStart !== -1) {
                 chartAnnotations['downtime_' + regionCount++] = {
                     type: 'box',
-                    xMin: downtimeStart - 0.5,
-                    xMax: powerData.length - 1,
+                    xMin: labels[downtimeStart],
+                    xMax: labels[powerData.length - 1],
                     backgroundColor: 'rgba(150, 150, 150, 0.12)',
                     borderWidth: 0
                 };
@@ -616,8 +726,8 @@
             if (lastActiveIndex !== -1 && lastActiveIndex < powerData.length - 1) {
                 chartAnnotations['lastActiveLine'] = {
                     type: 'line',
-                    xMin: lastActiveIndex,
-                    xMax: lastActiveIndex,
+                    xMin: labels[lastActiveIndex],
+                    xMax: labels[lastActiveIndex],
                     borderColor: 'rgba(239, 68, 68, 0.6)',
                     borderWidth: 1.5,
                     label: {
@@ -651,6 +761,10 @@
                             mode: 'index', intersect: false, backgroundColor: 'rgba(15, 23, 42, 0.95)',
                             titleFont: { size: 10 }, bodyFont: { size: 11 },
                             callbacks: { 
+                                title: function(context) {
+                                    const d = new Date(context[0].label);
+                                    return d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                                },
                                 label: function(context) {
                                     let label = context.dataset.label || '';
                                     if (label) label += ': ';
@@ -689,7 +803,20 @@
                         },
                         x: { 
                             grid: { display: false }, 
-                            ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } 
+                            ticks: { 
+                                font: { size: 9 }, 
+                                maxRotation: 0, 
+                                autoSkip: true, 
+                                maxTicksLimit: 8,
+                                callback: function(val, index) {
+                                    const label = this.getLabelForValue(val);
+                                    const d = new Date(label);
+                                    if (currentHours > 24) {
+                                        return d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0');
+                                    }
+                                    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                                }
+                            } 
                         }
                     },
                     interaction: { intersect: false }
@@ -894,6 +1021,210 @@
                 } catch (err) { alert('❌ Error: ' + err.message); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
             });
         }
+        // --- CYCLE ANALYZER JS ---
+        const btnAnalyze = document.getElementById('btn-analyze-cycles');
+        const cycleSection = document.getElementById('cycle-analyzer-section');
+        const cycleTableBody = document.querySelector('#cycle-table tbody');
+        const cycleSummaryChips = document.getElementById('cycle-summary-chips');
+        
+        let activeCycles = [];
+        let audit_data_source = 'N/A';
+
+        function suspicionColor(level) {
+            switch(level) {
+                case 'critical': return 'bg-error text-on-error';
+                case 'suspicious': return 'bg-orange-500 text-white';
+                case 'watch': return 'bg-yellow-400 text-on-surface';
+                default: return 'bg-primary-container text-on-primary-container';
+            }
+        }
+
+        function suspicionBannerColor(level) {
+            switch(level) {
+                case 'critical': return 'bg-error/10 border-error/20 text-error';
+                case 'suspicious': return 'bg-orange-50 border-orange-200 text-orange-700';
+                case 'watch': return 'bg-yellow-50 border-yellow-200 text-yellow-700';
+                default: return 'bg-surface-container-low border-surface-container text-on-surface-variant';
+            }
+        }
+
+        if (btnAnalyze) {
+            btnAnalyze.addEventListener('click', function() {
+                // Determine current range from chart
+                let end = new Date();
+                let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+                
+                // If forensic filter is active, use those dates
+                if (currentFilters.start && currentFilters.end) {
+                    start = new Date(currentFilters.start);
+                    end = new Date(currentFilters.end);
+                }
+
+                this.disabled = true;
+                this.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm">sync</span> Analyzing...';
+
+                fetch(`{{ route('analytics.power.cycles') }}?device_id=${deviceId}&start=${start.toISOString()}&end=${end.toISOString()}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        this.disabled = false;
+                        this.innerHTML = '<span class="material-symbols-outlined text-sm">analytics</span> Analyze Cycles';
+                        
+                        if (data.cycles.length === 0) {
+                            alert('No cycles detected for the selected range.');
+                            return;
+                        }
+
+                        activeCycles = data.cycles;
+                        audit_data_source = data.threshold_source;
+                        renderCycleData(data);
+                        drawCycleAnnotations(data);
+                        
+                        cycleSection.classList.remove('hidden');
+                        cycleSection.scrollIntoView({ behavior: 'smooth' });
+                    })
+                    .catch(err => {
+                        this.disabled = false;
+                        this.innerHTML = '<span class="material-symbols-outlined text-sm">analytics</span> Analyze Cycles';
+                        console.error('Cycle analysis failed:', err);
+                        alert('Analysis failed. Check console for details.');
+                    });
+            });
+        }
+
+        function renderCycleData(data) {
+            // Render Summary Chips
+            cycleSummaryChips.innerHTML = `
+                <div class="px-2 py-1 bg-secondary/10 text-secondary text-[9px] font-black rounded border border-secondary/20">TOTAL: ${data.summary.total_cycles}</div>
+                <div class="px-2 py-1 bg-primary/10 text-primary text-[9px] font-black rounded border border-primary/20">AVG DUR: ${data.summary.avg_duration}m</div>
+                <div class="px-2 py-1 bg-tertiary/10 text-tertiary text-[9px] font-black rounded border border-primary/20">AVG GAP: ${data.summary.avg_idle_gap}m</div>
+            `;
+
+            // Render Table
+            cycleTableBody.innerHTML = '';
+            data.cycles.forEach(c => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-surface-container-low transition-colors cursor-pointer';
+                tr.onclick = () => openCycleDetail(c.cycle_number - 1);
+                
+                const startTime = new Date(c.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const endTime = new Date(c.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-center font-black text-outline">${c.cycle_number}</td>
+                    <td class="px-4 py-3 font-mono">${startTime} - ${endTime}</td>
+                    <td class="px-4 py-3 text-right font-black text-on-surface">${c.duration_minutes}m</td>
+                    <td class="px-4 py-3 text-right text-outline">${Math.round(c.peak_kw)}</td>
+                    <td class="px-4 py-3 text-right text-outline">${Math.round(c.avg_kw)}</td>
+                    <td class="px-4 py-3 text-right font-black text-primary">${c.energy_estimate_kwh.toFixed(1)}</td>
+                    <td class="px-4 py-3 text-right text-outline">${c.idle_gap_minutes}m</td>
+                    <td class="px-4 py-3 text-right font-black text-error">${c.waste_kw}</td>
+                    <td class="px-4 py-3 text-right text-outline">${c.z_score}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase shadow-sm ${suspicionColor(c.suspicion_level)}">
+                            ${c.suspicion_level} (${c.suspicion_score})
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button class="text-secondary font-black hover:underline uppercase tracking-widest text-[8px]">Drilldown</button>
+                    </td>
+                `;
+                cycleTableBody.appendChild(tr);
+            });
+        }
+
+        function drawCycleAnnotations(data) {
+            if (!chartInstance) return;
+
+            // Get existing annotations
+            const currentAnnotations = chartInstance.options.plugins.annotation.annotations;
+            
+            // Clear previous cycle annotations
+            Object.keys(currentAnnotations).forEach(key => {
+                if (key.startsWith('cycle_')) delete currentAnnotations[key];
+            });
+            
+            data.cycles.forEach(c => {
+                const cycleKey = `cycle_${c.cycle_number}`;
+                
+                currentAnnotations[cycleKey] = {
+                    type: 'box',
+                    xMin: c.start_time,
+                    xMax: c.end_time,
+                    yMin: 0,
+                    yMax: c.peak_kw,
+                    backgroundColor: c.abnormal ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                    borderColor: c.abnormal ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)',
+                    borderWidth: 1,
+                    label: {
+                        display: true,
+                        content: [`#${c.cycle_number}`, `${c.duration_minutes}m`],
+                        position: 'start',
+                        color: c.abnormal ? '#ef4444' : '#10b981',
+                        font: { size: 9, weight: 'bold' },
+                        padding: 4
+                    }
+                };
+            });
+
+            chartInstance.update();
+        }
+
+        window.openCycleDetail = function(index) {
+            const cycle = activeCycles[index];
+            if (!cycle) return;
+
+            const setText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = text;
+            };
+
+            setText('cycle-modal-title', `Cycle #${cycle.cycle_number} Details`);
+            setText('cycle-modal-subtitle', `${new Date(cycle.start_time).toLocaleString()} - ${new Date(cycle.end_time).toLocaleTimeString()}`);
+            
+            setText('cycle-detail-duration', `${cycle.duration_minutes}m`);
+            setText('cycle-detail-energy', `${cycle.energy_estimate_kwh.toFixed(2)} kWh`);
+            setText('cycle-detail-avg', `${cycle.avg_kw.toFixed(1)} kW`);
+            setText('cycle-detail-peak', `${cycle.peak_kw.toFixed(1)} kW`);
+            setText('cycle-detail-gap', `${cycle.idle_gap_minutes}m`);
+            
+            // Estimated Cost (Mock tariff 1444.7)
+            const cost = cycle.energy_estimate_kwh * 1444.7;
+            setText('cycle-detail-cost', `Rp ${Math.round(cost).toLocaleString()}`);
+            
+            // Idle Leakage
+            setText('cycle-detail-idle-cost', `Rp ${cycle.idle_cost_loss.toLocaleString()}`);
+            
+            // Audit Metadata
+            setText('cycle-modal-thresh-source', audit_data_source);
+            setText('cycle-modal-zscore', cycle.z_score);
+            setText('cycle-modal-standby', cycle.standby_baseline_kw);
+            setText('cycle-modal-waste', cycle.waste_kw);
+
+            // Suspicion Banner
+            const banner = document.getElementById('cycle-suspicion-banner');
+            const scoreVal = document.getElementById('suspicion-score-val');
+            const labelEl = document.getElementById('suspicion-label');
+
+            if (banner && scoreVal && labelEl) {
+                banner.className = `mb-4 p-3 rounded flex items-center justify-between border ${suspicionBannerColor(cycle.suspicion_level)}`;
+                scoreVal.innerText = cycle.suspicion_score;
+                labelEl.innerText = cycle.suspicion_level.toUpperCase();
+            }
+            
+            const warning = document.getElementById('cycle-anomaly-warning');
+            if (warning) {
+                if (cycle.abnormal) warning.classList.remove('hidden');
+                else warning.classList.add('hidden');
+            }
+
+            const modal = document.getElementById('cycle-modal');
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        window.closeCycleModal = function() {
+            document.getElementById('cycle-modal').classList.add('hidden');
+        };
+
     });
 </script>
 @endsection

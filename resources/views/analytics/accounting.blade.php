@@ -95,17 +95,24 @@
                             <th class="px-6 py-4">Date</th>
                             <th class="px-6 py-4">Device</th>
                             <th class="px-6 py-4 text-right">Usage (kWh)</th>
+                            <th class="px-6 py-4 text-right">Rate (Rp)</th>
                             <th class="px-6 py-4 text-right">Biaya (Rp)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-container-low">
                         @forelse($reports as $row)
                             <tr class="hover:bg-surface-container-low/50 transition-colors">
-                                <td class="px-6 py-4 font-mono text-xs font-medium text-on-surface">{{ \Carbon\Carbon::parse($row->recorded_date)->format('d M Y') }}</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-xs font-medium text-on-surface">{{ \Carbon\Carbon::parse($row->recorded_date)->format('d M Y') }}</span>
+                                        {!! $row->data_source_badge !!}
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-on-surface">{{ $row->device->name }}</div>
                                 </td>
                                 <td class="px-6 py-4 text-right font-medium text-on-surface-variant">{{ number_format($row->kwh_usage, 2) }}</td>
+                                <td class="px-6 py-4 text-right font-mono text-[10px] text-outline">Rp {{ number_format($row->applied_rate, 2) }}</td>
                                 <td class="px-6 py-4 text-right font-black text-tertiary">Rp {{ number_format($row->energy_cost, 0) }}</td>
                             </tr>
                         @empty

@@ -145,7 +145,7 @@
                                     <div class="mt-1 text-[10px] font-mono text-outline">{{ $log->event_code }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="font-bold text-on-surface">{{ $log->device->name ?? 'N/A' }}</div>
+                                    <div class="font-bold text-on-surface">{{ $log->device?->name ?? 'System' }}</div>
                                     <div class="text-[9px] text-outline">{{ $log->source_layer }} layer</div>
                                 </td>
                                 <td class="px-6 py-4 max-w-xs">
@@ -166,7 +166,7 @@
                                         {{ strtoupper($log->status) }}
                                     </span>
                                     @if($log->status == 'acknowledged')
-                                        <div class="text-[9px] text-outline mt-1 italic">By {{ $log->acknowledger->name ?? 'User' }}</div>
+                                        <div class="text-[9px] text-outline mt-1 italic">By {{ $log->acknowledger?->name ?? '-' }}</div>
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 text-right">
@@ -235,11 +235,12 @@
                 </div>
             </div>
             
-            <!-- ESCALATION TIMELINE -->
+            <!-- LIFECYCLE TIMELINE -->
             <div class="mt-6 pt-6 border-t border-outline/10">
-                <label class="text-[10px] font-bold text-outline uppercase tracking-wider mb-2 block">Escalation History</label>
-                <div id="modalEscalations" class="space-y-3">
-                    <div class="text-[10px] text-outline italic">No escalations triggered for this incident.</div>
+                <label class="text-[10px] font-bold text-outline uppercase tracking-wider mb-2 block">Incident Lifecycle History</label>
+                <div id="modalTimeline" class="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-outline-variant/30">
+                    <!-- Loaded via AJAX -->
+                    <div class="text-[10px] text-outline italic pl-8">Timeline events will be loaded here.</div>
                 </div>
             </div>
         </div>

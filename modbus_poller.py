@@ -309,7 +309,6 @@ def main():
             'voltage':      None,
             'current':      None,
             'power_factor': None,
-            'is_offline':   True,
         }
 
         try:

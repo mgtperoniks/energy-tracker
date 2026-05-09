@@ -12,9 +12,26 @@ use App\Exports\OperationalReportExport;
 use App\Exports\AccountingReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\CycleAnalyzerService;
 
 class ReportController extends Controller
 {
+    public function getCycles(Request $request, CycleAnalyzerService $service)
+    {
+        $request->validate([
+            'device_id' => 'required|exists:devices,id',
+            'start' => 'required|date',
+            'end' => 'required|date',
+        ]);
+
+        $result = $service->analyze(
+            $request->device_id,
+            $request->start,
+            $request->end
+        );
+
+        return response()->json($result);
+    }
     public function operational(Request $request)
     {
         $deviceId = $request->query('device_id');
@@ -58,7 +75,9 @@ class ReportController extends Controller
         $endDate = $request->query('end_date', now()->toDateString());
 
         $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
-        $reports = $query->get();
+        
+        // Safety limit for PDF to prevent memory 500 error
+        $reports = $query->limit(1000)->get();
 
         // Apply live hydration for current day records
         foreach ($reports as $report) {
@@ -166,7 +185,8 @@ class ReportController extends Controller
             $query->where('device_id', $deviceId);
         }
 
-        $reports = $query->orderBy('recorded_date', 'desc')->get();
+        // Safety limit for PDF to prevent memory 500 error
+        $reports = $query->orderBy('recorded_date', 'desc')->limit(1000)->get();
         
         // Live Hydration for accuracy
         foreach ($reports as $report) {

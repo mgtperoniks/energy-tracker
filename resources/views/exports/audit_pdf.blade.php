@@ -71,14 +71,14 @@
             <tr>
                 @if($viewMode == 'grouped')
                     <td>{{ \Carbon\Carbon::parse($log->last_seen)->format('d M H:i') }}</td>
-                    <td>{{ $log->device->name ?? 'System' }}</td>
+                    <td>{{ $log->device?->name ?? 'System' }}</td>
                     <td>{{ $log->event_code }}</td>
                     <td class="{{ $log->severity == 'CRITICAL' ? 'severity-critical' : '' }}">{{ $log->severity }}</td>
                     <td style="font-weight: bold; text-align: center;">{{ $log->incident_count }}x</td>
                     <td>{{ \Carbon\Carbon::parse($log->first_seen)->format('d M H:i') }} - {{ \Carbon\Carbon::parse($log->last_seen)->format('d M H:i') }}</td>
                 @else
                     <td>{{ $log->detected_at->format('d M H:i') }}</td>
-                    <td>{{ $log->device->name ?? 'System' }}</td>
+                    <td>{{ $log->device?->name ?? 'System' }}</td>
                     <td>{{ $log->event_code }}</td>
                     <td class="{{ $log->severity == 'CRITICAL' ? 'severity-critical' : '' }}">{{ $log->severity }}</td>
                     <td>{{ strtoupper($log->status) }}</td>
@@ -97,14 +97,14 @@
         <h3>Critical Incident Drilldown</h3>
         @foreach($logs->where('severity', 'CRITICAL')->take(10) as $log)
         <div class="detail-card">
-            <div class="detail-title">[{{ $log->event_code }}] {{ $log->title }} - {{ $log->device->name ?? 'System' }}</div>
+            <div class="detail-title">[{{ $log->event_code }}] {{ $log->title }} - {{ $log->device?->name ?? 'System' }}</div>
             <p><strong>Message:</strong> {{ $log->message }}</p>
             <p><strong>Root Cause:</strong> {{ $log->root_cause ?? 'Pending investigation' }}</p>
             
             <div class="timeline">
                 <div class="timeline-item">● Detected: {{ $log->detected_at->format('Y-m-d H:i:s') }}</div>
                 @if($log->acknowledged_at)
-                    <div class="timeline-item">● Acknowledged: {{ $log->acknowledged_at->format('Y-m-d H:i:s') }} (by {{ $log->acknowledger->name ?? 'User' }})</div>
+                    <div class="timeline-item">● Acknowledged: {{ $log->acknowledged_at->format('Y-m-d H:i:s') }} (by {{ $log->acknowledger?->name ?? '-' }})</div>
                 @endif
                 @if($log->resolved_at)
                     <div class="timeline-item">● Resolved: {{ $log->resolved_at->format('Y-m-d H:i:s') }}</div>

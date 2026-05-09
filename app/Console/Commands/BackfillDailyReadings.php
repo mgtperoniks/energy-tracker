@@ -96,7 +96,13 @@ class BackfillDailyReadings extends Command
                 continue;
             }
 
-            $activeRate = ElectricityTariff::getRateForDate($dateStr);
+            $activeTariff = ElectricityTariff::where('effective_date', '<=', $dateStr)
+                ->orderBy('effective_date', 'desc')
+                ->first();
+            
+            $activeRate = $activeTariff ? (float) $activeTariff->rate_per_kwh : 0.0;
+            $tariffId = $activeTariff ? $activeTariff->id : null;
+            
             $upsertData = [];
 
             foreach ($aggregates as $agg) {
@@ -115,6 +121,9 @@ class BackfillDailyReadings extends Command
                     'avg_current' => $agg->avg_current,
                     'avg_power_factor' => $agg->avg_power_factor,
                     'total_sample_count' => $agg->total_sample_count,
+                    'data_source' => 'manual_backfill',
+                    'tariff_id_snapshot' => $tariffId,
+                    'tariff_rate_snapshot' => $activeRate,
                 ];
             }
 
@@ -125,7 +134,8 @@ class BackfillDailyReadings extends Command
                 [
                     'kwh_total', 'kwh_usage', 'energy_cost',
                     'avg_power_kw', 'min_power_kw', 'max_power_kw', 
-                    'avg_voltage', 'avg_current', 'avg_power_factor', 'total_sample_count'
+                    'avg_voltage', 'avg_current', 'avg_power_factor', 'total_sample_count', 'data_source',
+                    'tariff_id_snapshot', 'tariff_rate_snapshot'
                 ]
             );
 

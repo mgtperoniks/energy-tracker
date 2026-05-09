@@ -33,14 +33,16 @@ class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, Sh
             'Machine Name',
             'Usage (kWh)',
             'Rate (Rp/kWh)',
-            'Total Cost (Rp)'
+            'Total Cost (Rp)',
+            'Data Source'
         ];
     }
 
     public function map($row): array
     {
-        // Calculate rate if possible (cost / usage)
-        $rate = $row->kwh_usage > 0 ? $row->energy_cost / $row->kwh_usage : 0;
+        $row->hydrateLive();
+
+        $rate = $row->applied_rate;
 
         return [
             $row->recorded_date ? $row->recorded_date->format('Y-m-d') : '-',
@@ -48,7 +50,8 @@ class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, Sh
             optional(optional($row->device)->machine)->name ?? '-',
             round($row->kwh_usage, 2),
             round($rate, 2),
-            round($row->energy_cost, 0)
+            round($row->energy_cost, 0),
+            strtoupper($row->data_source ?? 'live')
         ];
     }
 
@@ -88,6 +91,9 @@ class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, Sh
                 $delegate->getStyle("F2:F{$footerRow}")
                     ->getNumberFormat()
                     ->setFormatCode('"Rp "#,##0');
+
+                // Style for Data Source column (G)
+                $delegate->getStyle("G2:G{$footerRow}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
             },
         ];
     }

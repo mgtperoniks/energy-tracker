@@ -23,6 +23,14 @@ Schedule::command('energy:aggregate-daily')
         logger()->info('Aggregation success (daily)');
     });
 
+Schedule::command('energy:generate-health-snapshot')
+    ->dailyAt('07:00')
+    ->withoutOverlapping()
+    ->onSuccess(function () {
+        Illuminate\Support\Facades\Cache::forever('cron_generate_health_snapshot', now());
+        logger()->info('System Health Snapshot success');
+    });
+
 // --- DATA RETENTION LIFECYCLE ---
 
 // Prune data raw (> 365 hari)
@@ -68,6 +76,6 @@ Schedule::call(function () {
 
 // Backup harian DB
 Schedule::command('system:backup-db')
-    ->dailyAt('01:00')
+    ->dailyAt('23:30')
     ->withoutOverlapping()
     ->onSuccess(fn () => \Illuminate\Support\Facades\Cache::forever('cron_backup_db', now()));

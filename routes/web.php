@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/audit/{log}/ignore', [\App\Http\Controllers\AuditController::class, 'ignore'])->name('audit.ignore');
         Route::post('/audit/{log}/reopen', [\App\Http\Controllers\AuditController::class, 'reopen'])->name('audit.reopen');
         Route::get('/audit/export', [\App\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
+        Route::get('/power-history/cycles', [\App\Http\Controllers\ReportController::class, 'getCycles'])->name('power.cycles');
     });
 
     // 4. ASSETS
@@ -57,6 +58,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/poller-logs', [\App\Http\Controllers\AdminController::class, 'pollerLogs'])->name('poller-logs');
         Route::get('/reset-history', [\App\Http\Controllers\AdminController::class, 'resetHistory'])->name('reset-history');
         Route::get('/deployment-health', [\App\Http\Controllers\AdminController::class, 'deploymentHealth'])->name('deployment-health');
+        
+        // 6. PRODUCTION OBSERVATION CHECKLIST
+        Route::prefix('checklists')->name('checklists.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\ProductionChecklistController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\ProductionChecklistController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\ProductionChecklistController::class, 'store'])->name('store');
+            Route::get('/{checklist}/pdf', [\App\Http\Controllers\ProductionChecklistController::class, 'exportPdf'])->name('pdf');
+        });
     });
 
     // API / AJAX Routes

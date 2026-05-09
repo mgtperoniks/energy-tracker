@@ -63,7 +63,12 @@
                     <tbody class="divide-y divide-surface-container-low">
                         @forelse($reports as $row)
                             <tr class="hover:bg-surface-container-low/50 transition-colors">
-                                <td class="px-6 py-4 font-mono text-xs font-medium text-on-surface">{{ \Carbon\Carbon::parse($row->recorded_date)->format('d M Y') }}</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-xs font-medium text-on-surface">{{ \Carbon\Carbon::parse($row->recorded_date)->format('d M Y') }}</span>
+                                        {!! $row->data_source_badge !!}
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-on-surface">{{ $row->device->name }}</div>
                                     <div class="text-[10px] text-outline mt-0.5">

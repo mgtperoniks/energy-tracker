@@ -47,7 +47,12 @@ class AggregateDailyReadings extends Command
             }
 
             // COST LAYER: Ambil rate aktif untuk tanggal target
-            $activeRate = \App\Models\ElectricityTariff::getRateForDate($targetDate->toDateString());
+            $activeTariff = \App\Models\ElectricityTariff::where('effective_date', '<=', $targetDate->toDateString())
+                ->orderBy('effective_date', 'desc')
+                ->first();
+            
+            $activeRate = $activeTariff ? (float) $activeTariff->rate_per_kwh : 0.0;
+            $tariffId = $activeTariff ? $activeTariff->id : null;
 
             $upsertData = [];
 
@@ -67,6 +72,9 @@ class AggregateDailyReadings extends Command
                     'avg_current' => $agg->daily_avg_current,
                     'avg_power_factor' => $agg->daily_avg_power_factor,
                     'total_sample_count' => $agg->total_sample_count, // Simpan untuk audit bulanan
+                    'data_source' => 'live',
+                    'tariff_id_snapshot' => $tariffId,
+                    'tariff_rate_snapshot' => $activeRate,
                 ];
             }
 
@@ -76,7 +84,8 @@ class AggregateDailyReadings extends Command
                 [
                     'kwh_total', 'kwh_usage', 'energy_cost',
                     'avg_power_kw', 'min_power_kw', 'max_power_kw', 
-                    'avg_voltage', 'avg_current', 'avg_power_factor', 'total_sample_count'
+                    'avg_voltage', 'avg_current', 'avg_power_factor', 'total_sample_count', 'data_source',
+                    'tariff_id_snapshot', 'tariff_rate_snapshot'
                 ]
             );
 

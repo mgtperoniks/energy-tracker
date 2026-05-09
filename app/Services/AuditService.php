@@ -43,6 +43,8 @@ class AuditService
             'source_layer' => $source
         ]);
 
+        $log->logEvent('created', null, ['source' => $source]);
+
         // Trigger Notification
         app(\App\Services\NotificationService::class)->createFromAudit($log);
 

@@ -21,6 +21,9 @@ class PowerReadingDaily extends Model
         'avg_power_factor' => 'decimal:3',
         'recorded_date' => 'date',
         'total_sample_count' => 'integer',
+        'data_source' => 'string',
+        'tariff_id_snapshot' => 'integer',
+        'tariff_rate_snapshot' => 'decimal:2',
     ];
 
     public function device()
@@ -57,8 +60,59 @@ class PowerReadingDaily extends Model
                 $this->avg_power_factor = (float) $liveData->live_avg_pf;
                 $this->total_sample_count = (int) $liveData->live_samples;
             }
+
+            // Always calculate energy cost if usage exists for today
+            if ($this->kwh_usage > 0) {
+                // Use snapshot if exists, otherwise fallback to live lookup
+                if ($this->tariff_rate_snapshot) {
+                    $activeRate = (float) $this->tariff_rate_snapshot;
+                } else {
+                    $activeRate = ElectricityTariff::getRateForDate($today);
+                }
+                
+                $this->energy_cost = (float) ($this->kwh_usage * $activeRate);
+            }
         }
         
         return $this;
+    }
+
+    /**
+     * Return tailwind-styled badge based on data source
+     */
+    public function getDataSourceBadgeAttribute()
+    {
+        $source = $this->data_source ?? 'live';
+        $styles = [
+            'live' => 'bg-success/10 text-success border-success/20',
+            'manual_backfill' => 'bg-warning/10 text-warning border-warning/20',
+            'recovered' => 'bg-info/10 text-info border-info/20',
+            'estimated' => 'bg-error/10 text-error border-error/20',
+        ];
+        
+        $labels = [
+            'live' => 'LIVE',
+            'manual_backfill' => 'BACKFILLED',
+            'recovered' => 'RECOVERED',
+            'estimated' => 'ESTIMATED',
+        ];
+        
+        $class = $styles[$source] ?? $styles['live'];
+        $label = $labels[$source] ?? $labels['live'];
+        
+        return "<span class=\"px-1.5 py-0.5 rounded border {$class} text-[9px] font-black tracking-wider\">{$label}</span>";
+    }
+
+    /**
+     * Get the rate applied to this record (snapshot or live fallback)
+     */
+    public function getAppliedRateAttribute()
+    {
+        if ($this->tariff_rate_snapshot) {
+            return (float) $this->tariff_rate_snapshot;
+        }
+
+        // Fallback for legacy or un-aggregated data
+        return ElectricityTariff::getRateForDate($this->recorded_date->toDateString());
     }
 }

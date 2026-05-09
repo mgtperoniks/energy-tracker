@@ -24,7 +24,8 @@ class AuditController extends Controller
 
         if ($viewMode === 'grouped') {
             // Group by fingerprint and status to see recurring issues
-            $logs = AuditLog::select(
+            // Fix: Use the existing filtered query object instead of starting fresh
+            $logs = $query->select(
                     'fingerprint',
                     'event_code',
                     'event_type',
@@ -102,39 +103,72 @@ class AuditController extends Controller
                                     ->where('detected_at', '>=', $last7Days)
                                     ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, detected_at, acknowledged_at)) as avg_mtta')
                                     ->first()->avg_mtta ?? 0, 1),
-            'top_device'      => $topDevice ? $topDevice->device->name : 'N/A'
+            'top_device'      => $topDevice?->device?->name ?? 'System'
         ];
     }
 
     public function acknowledge(AuditLog $log)
     {
+        // Lifecycle Guard: Only allow open -> acknowledged
+        if ($log->status !== AuditLog::STATUS_OPEN) {
+            return back()->with('warning', 'Incident is already ' . strtoupper($log->status) . ' or cannot be acknowledged.');
+        }
+
         $log->update([
             'status' => AuditLog::STATUS_ACKNOWLEDGED,
             'acknowledged_by' => auth()->id(),
             'acknowledged_at' => now(),
         ]);
+
+        $log->logEvent('acknowledged');
+
         return back()->with('success', 'Incident ACKNOWLEDGED.');
     }
 
     public function resolve(AuditLog $log, Request $request)
     {
+        // Lifecycle Guard: allowed only from open or acknowledged
+        if (!in_array($log->status, [AuditLog::STATUS_OPEN, AuditLog::STATUS_ACKNOWLEDGED])) {
+            return back()->with('warning', 'Incident cannot be resolved from ' . strtoupper($log->status) . ' status.');
+        }
+
         $log->resolve($request->input('root_cause', 'Investigated and resolved'));
         return back()->with('success', 'Incident marked as RESOLVED.');
     }
 
     public function ignore(AuditLog $log)
     {
+        // Lifecycle Guard: allowed only from open or acknowledged
+        if (!in_array($log->status, [AuditLog::STATUS_OPEN, AuditLog::STATUS_ACKNOWLEDGED])) {
+            return back()->with('warning', 'Incident cannot be ignored from ' . strtoupper($log->status) . ' status.');
+        }
+
         $log->update(['status' => AuditLog::STATUS_IGNORED]);
+
+        $log->logEvent('ignored');
+
         return back()->with('success', 'Incident IGNORED.');
     }
 
     public function reopen(AuditLog $log)
     {
+        // Lifecycle Guard: allowed only from resolved or ignored
+        if (!in_array($log->status, [AuditLog::STATUS_RESOLVED, AuditLog::STATUS_IGNORED])) {
+            return back()->with('warning', 'Incident is already active or cannot be reopened.');
+        }
+
         $log->update([
             'status' => AuditLog::STATUS_OPEN,
             'resolved_at' => null,
-            'duration_minutes' => null
+            'duration_minutes' => null,
+            // Preserve original ACK history (acknowledged_at, acknowledged_by)
+            'reopened_at' => now(),
+            'reopened_by' => auth()->id(),
+            'reopen_count' => $log->reopen_count + 1
         ]);
+
+        $log->logEvent('reopened');
+
         return back()->with('success', 'Incident REOPENED.');
     }
 

@@ -49,7 +49,7 @@ class AuditExcelExport implements FromCollection, WithHeadings, WithMapping, Wit
         if ($this->viewMode === 'grouped') {
             return [
                 $log->fingerprint,
-                $log->device->name ?? 'System',
+                $log->device?->name ?? 'System',
                 $log->event_code,
                 $log->event_type,
                 $log->severity,
@@ -66,7 +66,7 @@ class AuditExcelExport implements FromCollection, WithHeadings, WithMapping, Wit
 
         return [
             $log->id,
-            $log->device->name ?? 'System',
+            $log->device?->name ?? 'System',
             $log->event_code,
             $log->event_type,
             $log->severity,
@@ -75,7 +75,7 @@ class AuditExcelExport implements FromCollection, WithHeadings, WithMapping, Wit
             $log->message,
             $log->detected_at->format('Y-m-d H:i:s'),
             $log->acknowledged_at ? $log->acknowledged_at->format('Y-m-d H:i:s') : '-',
-            $log->acknowledger->name ?? '-',
+            $log->acknowledger?->name ?? '-',
             $log->resolved_at ? $log->resolved_at->format('Y-m-d H:i:s') : '-',
             $log->duration_minutes ?? '-',
             $mtta ?? '-',
