@@ -18,6 +18,7 @@ Route::prefix('dashboard')->group(function () {
 Route::prefix('machines')->group(function () {
     Route::get('/', [MachineController::class, 'index']);
     Route::get('/{id}/energy', [MachineController::class, 'energyData']);
+    Route::get('/{id}/readings', [MachineController::class, 'readings']);
 
     // Meter reset endpoints
     // POST   /api/machines/{id}/reset  → log a manual reset (call BEFORE physically resetting)

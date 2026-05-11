@@ -67,16 +67,17 @@ class ReadingController extends Controller
             // Use raw COALESCE upsert so partial/null readings never overwrite good data
             DB::statement("
                 INSERT INTO power_readings_raw
-                    (device_id, recorded_at, meter_kwh_raw, kwh_total, power_kw, voltage, `current`, power_factor)
+                    (device_id, recorded_at, meter_kwh_raw, kwh_total, power_kw, voltage, `current`, power_factor, is_offline)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     meter_kwh_raw = COALESCE(VALUES(meter_kwh_raw), meter_kwh_raw),
                     kwh_total     = COALESCE(VALUES(kwh_total), kwh_total),
                     power_kw      = COALESCE(VALUES(power_kw), power_kw),
                     voltage       = COALESCE(VALUES(voltage), voltage),
                     `current`     = COALESCE(VALUES(`current`), `current`),
-                    power_factor  = COALESCE(VALUES(power_factor), power_factor)
+                    power_factor  = COALESCE(VALUES(power_factor), power_factor),
+                    is_offline    = COALESCE(VALUES(is_offline), is_offline)
             ", [
                 $device->id,
                 $recordedAt->toDateTimeString(),
@@ -86,6 +87,7 @@ class ReadingController extends Controller
                 $validated['voltage'] ?? null,
                 $validated['current'] ?? null,
                 $validated['power_factor'] ?? null,
+                $isOffline ? 1 : 0,
             ]);
 
             $device->update([

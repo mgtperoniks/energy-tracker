@@ -75,7 +75,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/read-all', [\App\Http\Controllers\NotificationController::class, 'readAll'])->name('read-all');
     });
 
-    Route::get('/api/machines/{id}/readings', [\App\Http\Controllers\Api\MachineController::class, 'readings'])->name('api.machines.readings');
     Route::get('/api/charts/device', [\App\Http\Controllers\Api\ChartController::class, 'getDeviceChart'])->name('api.charts.device');
     Route::get('/api/charts/facility', [\App\Http\Controllers\Api\ChartController::class, 'getFacilityChart'])->name('api.charts.facility');
 

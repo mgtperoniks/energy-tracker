@@ -39,17 +39,17 @@ class PowerReadingRaw extends Model
         }
         */
 
-        // STANDBY: All readings null = meter powered but machine completely off
-        if ($this->voltage === null && $this->current === null && $this->power_kw === null) {
+        // STANDBY: meter powered, machine completely off (all values null)
+        if ($this->voltage === null && $this->current === null && ($this->power_kw === null || (float)$this->power_kw === 0.0)) {
             return 'STANDBY';
         }
 
-        // FAULT: Partial telemetry missing (some fields present, some missing)
+        // FAULT: Some telemetry missing while other values present
         if ($this->voltage === null || $this->current === null) {
             return 'FAULT';
         }
 
-        $power = (float) $this->power_kw;
+        $power = (float) ($this->power_kw ?? 0);
 
         if ($power < 3) return 'IDLE';
         if ($power < 30) return 'STANDBY';
