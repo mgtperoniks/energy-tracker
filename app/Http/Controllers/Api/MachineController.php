@@ -39,32 +39,37 @@ class MachineController extends Controller
 
     public function readings($id, Request $request)
     {
-        $machine = Machine::findOrFail($id);
-        $limit = (int) $request->get('limit', 15);
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
+        try {
+            $machine = Machine::findOrFail($id);
+            $limit = (int) $request->get('limit', 15);
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
 
-        $query = \App\Models\PowerReadingRaw::whereIn('device_id', function($query) use ($machine) {
-                        $query->select('id')->from('devices')->where('machine_id', $machine->id);
-                    });
+            $query = \App\Models\PowerReadingRaw::whereIn('device_id', function($q) use ($machine) {
+                            $q->select('id')->from('devices')->where('machine_id', $machine->id);
+                        });
 
-        if ($startDate && $endDate) {
-            try {
-                $start = \Carbon\Carbon::parse($startDate)->setTimezone(config('app.timezone'));
-                $end = \Carbon\Carbon::parse($endDate)->setTimezone(config('app.timezone'));
-                $query->whereBetween('recorded_at', [$start, $end]);
-            } catch (\Exception $e) {
-                // Fallback if parse fails
+            if ($startDate && $endDate) {
+                try {
+                    $start = \Carbon\Carbon::parse($startDate)->setTimezone(config('app.timezone'));
+                    $end   = \Carbon\Carbon::parse($endDate)->setTimezone(config('app.timezone'));
+                    $query->whereBetween('recorded_at', [$start, $end]);
+                } catch (\Exception $e) {
+                    // Fallback if parse fails
+                }
             }
+
+            $readings = $query->orderBy('recorded_at', 'desc')->paginate($limit);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $readings
+            ]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Readings fetch failed', ['error' => $e->getMessage()]);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
-
-        $readings = $query->orderBy('recorded_at', 'desc')
-                    ->paginate($limit);
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $readings
-        ]);
     }
 }
 
