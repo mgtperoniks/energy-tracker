@@ -28,6 +28,10 @@ INTERVAL_SECONDS    = int(os.getenv('POLLING_INTERVAL', 300))
 DEBUG_RAW_REGISTERS = os.getenv('DEBUG_RAW_REGISTERS', 'false').lower() == 'true'
 # FRAMER: 'socket' (default Modbus TCP) or 'rtu' (Modbus RTU over TCP)
 MODBUS_FRAMER       = os.getenv('MODBUS_FRAMER', 'socket').lower()
+# Stagger start to avoid RS485 bus collision (seconds). Set 0 for slave3, 30 for slave5.
+STARTUP_DELAY       = int(os.getenv('STARTUP_DELAY', 0))
+# Delay between individual register reads (seconds). Helps on slow RS485 gateways.
+INTER_REG_DELAY     = float(os.getenv('INTER_REG_DELAY', 0.5))
 
 # --- FILE PATHS ---
 LOCK_FILE      = "/tmp/modbus_slave_{}.lock".format(PHYSICAL_SLAVE_ID)
@@ -182,9 +186,13 @@ def poll_meter():
     try:
         OFFLINE_COUNT = 0 # Reset on success
         wh_total = read_int64(client, REG_TOTAL_WH, PHYSICAL_SLAVE_ID)
+        time.sleep(INTER_REG_DELAY)
         kw       = read_float(client, REG_TOTAL_KW, PHYSICAL_SLAVE_ID)
+        time.sleep(INTER_REG_DELAY)
         amps     = read_float(client, REG_AVG_AMP, PHYSICAL_SLAVE_ID)
+        time.sleep(INTER_REG_DELAY)
         volts    = read_float(client, REG_AVG_VOLT, PHYSICAL_SLAVE_ID)
+        time.sleep(INTER_REG_DELAY)
         pf       = read_float(client, REG_PF, PHYSICAL_SLAVE_ID)
         
         all_failed = (wh_total is None and kw is None and amps is None and volts is None and pf is None)
@@ -269,7 +277,13 @@ def main():
     print("Register Map  : E={}, P={}, V={}, I={}, PF={}".format(
         REG_TOTAL_WH, REG_TOTAL_KW, REG_AVG_VOLT, REG_AVG_AMP, REG_PF
     ), flush=True)
+    print("Startup Delay : {} sec".format(STARTUP_DELAY), flush=True)
+    print("Inter-Reg Delay: {} sec".format(INTER_REG_DELAY), flush=True)
     print("====================================", flush=True)
+
+    if STARTUP_DELAY > 0:
+        print("[{}] [BOOT] Staggered start: waiting {} sec to avoid RS485 collision...".format(get_log_ts(), STARTUP_DELAY), flush=True)
+        time.sleep(STARTUP_DELAY)
 
     poll_count = 0
     while True:
