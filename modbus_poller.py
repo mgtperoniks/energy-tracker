@@ -233,6 +233,7 @@ def poll_meter():
         client.close()
 
 def main():
+    global OFFLINE_COUNT
     lock_handle = acquire_lock()
     print("====================================", flush=True)
     print("INDUSTRIAL HISTORIAN POLLER ACTIVE", flush=True)
