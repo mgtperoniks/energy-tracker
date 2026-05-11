@@ -112,13 +112,15 @@ def process_buffer():
             
             response = requests.post(LARAVEL_API_URL, json=payload, headers=headers, timeout=5)
             if response.status_code == 200:
+                print("[{}] [API OK] Buffered payload sent: {}".format(get_log_ts(), os.path.basename(f_path)), flush=True)
                 os.remove(f_path)
                 count += 1
             else:
+                print("[{}] [API ERROR] Status: {} | Body: {}".format(get_log_ts(), response.status_code, response.text), flush=True)
+                print("[{}] [API PAYLOAD] {}".format(get_log_ts(), json.dumps(payload)), flush=True)
                 break # Stop on first failure
         except Exception as e:
-            if DEBUG_RAW_REGISTERS:
-                print("[{}] BUFFER SEND FAILED: {}".format(get_log_ts(), e), flush=True)
+            print("[{}] [API EXCEPTION] {}".format(get_log_ts(), e), flush=True)
             break
             
     if count > 0:
@@ -294,11 +296,15 @@ def main():
         try:
             headers = {'X-Device-Token': DEVICE_TOKEN, 'Content-Type': 'application/json'}
             response = requests.post(LARAVEL_API_URL, json=payload, headers=headers, timeout=10)
-            if response.status_code == 200:
-                print("[{}] #{}: API OK".format(get_log_ts(), poll_count), flush=True)
+            
+            if response.status_code in [200, 201]:
+                print("[{}] [API OK] #{}: Sent successfully".format(get_log_ts(), poll_count), flush=True)
             else:
+                print("[{}] [API ERROR] Status: {} | Body: {}".format(get_log_ts(), response.status_code, response.text), flush=True)
+                print("[{}] [API PAYLOAD] {}".format(get_log_ts(), json.dumps(payload)), flush=True)
                 save_to_buffer(payload)
-        except Exception:
+        except Exception as e:
+            print("[{}] [API CONNECTION FAILED] {}".format(get_log_ts(), e), flush=True)
             save_to_buffer(payload)
 
         elapsed = time.time() - start_time
