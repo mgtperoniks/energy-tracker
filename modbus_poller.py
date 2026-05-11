@@ -1,6 +1,5 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.framer.rtu_framer import ModbusRtuFramer
-from pymodbus.framer.socket_framer import ModbusSocketFramer
+from pymodbus.transaction import ModbusRtuFramer, ModbusSocketFramer
 import requests
 import time
 import os
@@ -257,7 +256,18 @@ def main():
     lock_handle = acquire_lock()
     print("====================================", flush=True)
     print("INDUSTRIAL HISTORIAN POLLER ACTIVE", flush=True)
-    print("SLAVE: {} | BOOT: {}".format(PHYSICAL_SLAVE_ID, METER_BOOT_ID), flush=True)
+    print("====================================", flush=True)
+    print("Slave ID      : {}".format(PHYSICAL_SLAVE_ID), flush=True)
+    print("Report ID     : {}".format(REPORT_AS_SLAVE_ID), flush=True)
+    print("Boot ID       : {}".format(METER_BOOT_ID), flush=True)
+    print("Target        : {}:{}".format(MODBUS_IP, MODBUS_PORT), flush=True)
+    print("API Target    : {}".format(LARAVEL_API_URL), flush=True)
+    print("Polling       : {} sec".format(INTERVAL_SECONDS), flush=True)
+    print("Framer        : {}".format(MODBUS_FRAMER), flush=True)
+    print("Debug Raw     : {}".format("Enabled" if DEBUG_RAW_REGISTERS else "Disabled"), flush=True)
+    print("Register Map  : E={}, P={}, V={}, I={}, PF={}".format(
+        REG_TOTAL_WH, REG_TOTAL_KW, REG_AVG_VOLT, REG_AVG_AMP, REG_PF
+    ), flush=True)
     print("====================================", flush=True)
 
     poll_count = 0
