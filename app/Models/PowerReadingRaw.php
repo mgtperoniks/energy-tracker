@@ -39,7 +39,12 @@ class PowerReadingRaw extends Model
         }
         */
 
-        // FAULT: Missing critical telemetry (while supposedly online)
+        // STANDBY: All readings null = meter powered but machine completely off
+        if ($this->voltage === null && $this->current === null && $this->power_kw === null) {
+            return 'STANDBY';
+        }
+
+        // FAULT: Partial telemetry missing (some fields present, some missing)
         if ($this->voltage === null || $this->current === null) {
             return 'FAULT';
         }

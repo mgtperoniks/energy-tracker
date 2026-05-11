@@ -64,21 +64,29 @@ class ReadingController extends Controller
 
             $normalizedKwhTotal = $currentBaseline + $incomingKwhRaw;
 
-            // UPSERT: idempotent, tolerates replay bursts
-            PowerReadingRaw::upsert(
-                [[
-                    'device_id'     => $device->id,
-                    'recorded_at'   => $recordedAt->toDateTimeString(),
-                    'meter_kwh_raw' => $incomingKwhRaw,
-                    'kwh_total'     => $normalizedKwhTotal,
-                    'power_kw'      => $validated['power_kw'] ?? null,
-                    'voltage'       => $validated['voltage'] ?? null,
-                    'current'       => $validated['current'] ?? null,
-                    'power_factor'  => $validated['power_factor'] ?? null,
-                ]],
-                ['device_id', 'recorded_at'],
-                ['meter_kwh_raw', 'kwh_total', 'power_kw', 'voltage', 'current', 'power_factor']
-            );
+            // Use raw COALESCE upsert so partial/null readings never overwrite good data
+            DB::statement("
+                INSERT INTO power_readings_raw
+                    (device_id, recorded_at, meter_kwh_raw, kwh_total, power_kw, voltage, `current`, power_factor)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    meter_kwh_raw = COALESCE(VALUES(meter_kwh_raw), meter_kwh_raw),
+                    kwh_total     = COALESCE(VALUES(kwh_total), kwh_total),
+                    power_kw      = COALESCE(VALUES(power_kw), power_kw),
+                    voltage       = COALESCE(VALUES(voltage), voltage),
+                    `current`     = COALESCE(VALUES(`current`), `current`),
+                    power_factor  = COALESCE(VALUES(power_factor), power_factor)
+            ", [
+                $device->id,
+                $recordedAt->toDateTimeString(),
+                $incomingKwhRaw,
+                $normalizedKwhTotal,
+                $validated['power_kw'] ?? null,
+                $validated['voltage'] ?? null,
+                $validated['current'] ?? null,
+                $validated['power_factor'] ?? null,
+            ]);
 
             $device->update([
                 'is_online'           => !$isOffline,

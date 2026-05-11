@@ -957,17 +957,17 @@
                     readings.forEach(row => {
                         const tr = document.createElement('tr');
                         tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
-                        const power = parseFloat(row.power_kw);
+                        const fmtNum = (v, dec=2) => { const n = parseFloat(v); return isNaN(n) ? (0).toFixed(dec) : n.toFixed(dec); };
                         const timestamp = formatWIB(row.recorded_at);
                         const statusHtml = row.status_badge;
 
                         tr.innerHTML = `
                             <td class="px-4 py-2 font-mono text-[10px] text-outline">${timestamp}</td>
-                            <td class="px-4 py-2 text-right font-black text-primary">${power.toFixed(2)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.voltage).toFixed(1)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.current).toFixed(1)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${parseFloat(row.power_factor || 1.0).toFixed(2)}</td>
-                            <td class="px-4 py-2 text-right font-bold text-on-surface">${parseFloat(row.kwh_total).toFixed(2)}</td>
+                            <td class="px-4 py-2 text-right font-black text-primary">${fmtNum(row.power_kw)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.voltage, 1)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.current, 1)}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.power_factor)}</td>
+                            <td class="px-4 py-2 text-right font-bold text-on-surface">${fmtNum(row.kwh_total)}</td>
                             <td class="px-4 py-2 text-center">${statusHtml}</td>
                             <td class="px-4 py-2 text-right">
                                 <button class="text-primary hover:underline text-[9px] font-black uppercase detail-btn"
