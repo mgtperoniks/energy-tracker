@@ -1,4 +1,6 @@
 from pymodbus.client import ModbusTcpClient
+from pymodbus.framer.rtu_framer import ModbusRtuFramer
+from pymodbus.framer.socket_framer import ModbusSocketFramer
 import requests
 import time
 import os
@@ -26,6 +28,8 @@ LARAVEL_API_URL     = os.getenv('MODBUS_API_URL', 'http://localhost/api/readings
 DEVICE_TOKEN        = os.getenv('DEVICE_TOKEN', '') 
 INTERVAL_SECONDS    = int(os.getenv('POLLING_INTERVAL', 300))
 DEBUG_RAW_REGISTERS = os.getenv('DEBUG_RAW_REGISTERS', 'false').lower() == 'true'
+# FRAMER: 'socket' (default Modbus TCP) or 'rtu' (Modbus RTU over TCP)
+MODBUS_FRAMER       = os.getenv('MODBUS_FRAMER', 'socket').lower()
 
 # --- FILE PATHS ---
 LOCK_FILE      = "/tmp/modbus_slave_{}.lock".format(PHYSICAL_SLAVE_ID)
@@ -114,7 +118,9 @@ def process_buffer():
                 count += 1
             else:
                 break # Stop on first failure
-        except Exception:
+        except Exception as e:
+            if DEBUG_RAW_REGISTERS:
+                print("[{}] BUFFER SEND FAILED: {}".format(get_log_ts(), e), flush=True)
             break
             
     if count > 0:
@@ -128,30 +134,44 @@ def sanitize_float(val):
 def read_float(client, address, slave):
     try:
         rr = client.read_holding_registers(address=address, count=2, slave=slave)
-        if rr.isError(): return None
+        if rr.isError():
+            if DEBUG_RAW_REGISTERS:
+                print("[{}] MODBUS READ ERROR at {}: {}".format(get_log_ts(), address, rr), flush=True)
+            return None
         raw = rr.registers
         if DEBUG_RAW_REGISTERS:
             print("[{}] DEBUG REG {} RAW: {}".format(get_log_ts(), address, raw), flush=True)
         raw_bytes = struct.pack('>HH', raw[0], raw[1])
         value = struct.unpack('>f', raw_bytes)[0]
         return value
-    except Exception: return None
+    except Exception as e:
+        if DEBUG_RAW_REGISTERS:
+            print("[{}] MODBUS EXCEPTION at {}: {}".format(get_log_ts(), address, e), flush=True)
+        return None
 
 def read_int64(client, address, slave):
     try:
         rr = client.read_holding_registers(address=address, count=4, slave=slave)
-        if rr.isError(): return None
+        if rr.isError():
+            if DEBUG_RAW_REGISTERS:
+                print("[{}] MODBUS READ ERROR at {}: {}".format(get_log_ts(), address, rr), flush=True)
+            return None
         raw = rr.registers
         if DEBUG_RAW_REGISTERS:
             print("[{}] DEBUG REG {} RAW: {}".format(get_log_ts(), address, raw), flush=True)
         value_bytes = struct.pack('>HHHH', raw[0], raw[1], raw[2], raw[3])
         value = struct.unpack('>q', value_bytes)[0]
         return value
-    except Exception: return None
+    except Exception as e:
+        if DEBUG_RAW_REGISTERS:
+            print("[{}] MODBUS EXCEPTION at {}: {}".format(get_log_ts(), address, e), flush=True)
+        return None
 
 def poll_meter():
     global LAST_KWH_READING, LAST_POLL_TIME, LAST_METER_BOOT_ID, LAST_TELEMETRY, STALE_COUNT, OFFLINE_COUNT
-    client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5)
+    
+    framer = ModbusSocketFramer if MODBUS_FRAMER == 'socket' else ModbusRtuFramer
+    client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5, framer=framer)
     
     if not client.connect():
         print("[{}] STATUS: OFFLINE (Cannot connect to {}:{})".format(get_log_ts(), MODBUS_IP, MODBUS_PORT), flush=True)
