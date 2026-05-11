@@ -1,5 +1,5 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.transaction import ModbusRtuFramer, ModbusSocketFramer
+from pymodbus.framer import ModbusRtuFramer, ModbusSocketFramer
 import requests
 import time
 import os
