@@ -131,7 +131,7 @@ def sanitize_float(val):
 
 def read_float(client, address, slave):
     try:
-        rr = client.read_holding_registers(address, 2, slave)
+        rr = client.read_holding_registers(address, count=2, device_id=slave)
         if rr.isError():
             if DEBUG_RAW_REGISTERS:
                 print("[{}] MODBUS READ ERROR at {}: {}".format(get_log_ts(), address, rr), flush=True)
@@ -149,7 +149,7 @@ def read_float(client, address, slave):
 
 def read_int64(client, address, slave):
     try:
-        rr = client.read_holding_registers(address, 4, slave)
+        rr = client.read_holding_registers(address, count=4, device_id=slave)
         if rr.isError():
             if DEBUG_RAW_REGISTERS:
                 print("[{}] MODBUS READ ERROR at {}: {}".format(get_log_ts(), address, rr), flush=True)
