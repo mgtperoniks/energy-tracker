@@ -38,5 +38,5 @@ Route::prefix('reports')->group(function () {
 });
 
 Route::post('/readings', [App\Http\Controllers\Api\ReadingController::class, 'store'])
-    ->middleware(['device.auth', 'throttle:ingestion']);
+    ->middleware(['device.auth']);
 
