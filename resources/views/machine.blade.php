@@ -972,11 +972,11 @@
                             <td class="px-4 py-2 text-right">
                                 <button class="text-primary hover:underline text-[9px] font-black uppercase detail-btn"
                                     data-timestamp="${timestamp}"
-                                    data-power="${power.toFixed(2)}"
-                                    data-voltage="${parseFloat(row.voltage).toFixed(1)}"
-                                    data-current="${parseFloat(row.current).toFixed(1)}"
-                                    data-pf="${parseFloat(row.power_factor || 1.0).toFixed(2)}"
-                                    data-kwh="${parseFloat(row.kwh_total).toFixed(2)}"
+                                    data-power="${fmtNum(row.power_kw)}"
+                                    data-voltage="${fmtNum(row.voltage, 1)}"
+                                    data-current="${fmtNum(row.current, 1)}"
+                                    data-pf="${fmtNum(row.power_factor)}"
+                                    data-kwh="${fmtNum(row.kwh_total)}"
                                     data-status_badge='${row.status_badge}'>
                                     Detail
                                 </button>
