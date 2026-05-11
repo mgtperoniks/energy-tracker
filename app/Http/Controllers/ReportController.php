@@ -11,27 +11,9 @@ use Illuminate\Support\Facades\DB;
 use App\Exports\OperationalReportExport;
 use App\Exports\AccountingReportExport;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Services\CycleAnalyzerService;
-
-class ReportController extends Controller
+use Barryvdh\DomPDF\Facade\Pdf;class ReportController extends Controller
 {
-    public function getCycles(Request $request, CycleAnalyzerService $service)
-    {
-        $request->validate([
-            'device_id' => 'required|exists:devices,id',
-            'start' => 'required|date',
-            'end' => 'required|date',
-        ]);
 
-        $result = $service->analyze(
-            $request->device_id,
-            $request->start,
-            $request->end
-        );
-
-        return response()->json($result);
-    }
     public function operational(Request $request)
     {
         $deviceId = $request->query('device_id');

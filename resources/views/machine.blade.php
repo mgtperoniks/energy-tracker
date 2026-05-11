@@ -140,9 +140,9 @@
                         <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
                     </div>
 
-                    <button id="btn-analyze-cycles" class="px-3 py-1 bg-secondary text-on-secondary text-[9px] font-black rounded hover:brightness-110 transition-all flex items-center gap-1.5 uppercase tracking-widest">
-                        <span class="material-symbols-outlined text-sm">analytics</span>
-                        Analyze Cycles
+                    <button id="btn-create-tag" class="px-3 py-1 bg-primary text-white text-[9px] font-black rounded hover:brightness-110 transition-all flex items-center gap-1.5 uppercase tracking-widest hidden">
+                        <span class="material-symbols-outlined text-sm">add_location_alt</span>
+                        Tag Selected Point
                     </button>
 
                     <!-- Custom Range / Forensic UI -->
@@ -161,39 +161,54 @@
                     </div>
                 </div>
             </div>
-            <div class="h-[330px] w-full">
-                <canvas id="powerChart"></canvas>
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex gap-2 text-[8px] font-black uppercase tracking-widest" id="chart-legend">
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(16, 185, 129, 0.8)">Start</span>
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(249, 115, 22, 0.8)">Melting</span>
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(148, 163, 184, 0.8)">Idle</span>
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(234, 179, 8, 0.8)">Test</span>
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(59, 130, 246, 0.8)">Pour</span>
+                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(239, 68, 68, 0.8)">End</span>
+                </div>
             </div>
-
-            <!-- CYCLE ANALYTICS LEDGER -->
-            <div id="cycle-analyzer-section" class="mt-6 pt-6 border-t border-surface-container-low hidden animate-in slide-in-from-top duration-500">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="text-[10px] font-black uppercase tracking-widest text-secondary flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm">cycle</span>
-                        Detected Operational Cycles
-                    </h4>
-                    <div id="cycle-summary-chips" class="flex gap-2">
-                        <!-- Filled by JS -->
+            <div class="flex gap-4">
+                <div class="h-[330px] flex-grow min-w-0">
+                    <canvas id="powerChart"></canvas>
+                </div>
+                <div class="w-64 border border-surface-container-low rounded bg-surface-container-lowest flex flex-col" id="timeline-panel">
+                    <div class="px-3 py-2 border-b border-surface-container-low bg-surface-container-low/50 sticky top-0">
+                        <h4 class="text-[9px] font-black uppercase tracking-widest text-on-surface">Timeline</h4>
+                    </div>
+                    <div class="flex-grow overflow-y-auto p-2 space-y-2 text-[10px]" id="timeline-content">
+                        <!-- timeline items -->
                     </div>
                 </div>
+            </div>
+
+            <!-- PHASE RECONSTRUCTION TABLE -->
+            <div id="phase-reconstruction-section" class="mt-6 pt-6 border-t border-surface-container-low hidden animate-in slide-in-from-top duration-500">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">timeline</span>
+                        Operational Phases
+                    </h4>
+                </div>
                 <div class="overflow-x-auto rounded border border-surface-container-low">
-                    <table class="w-full text-left text-[10px]" id="cycle-table">
+                    <table class="w-full text-left text-[10px]" id="phase-table">
                         <thead>
                             <tr class="bg-surface-container-low font-black text-on-surface-variant uppercase tracking-tighter">
-                                <th class="px-4 py-2 text-center">No</th>
-                                <th class="px-4 py-2">Start / End</th>
-                                <th class="px-4 py-2 text-right">Duration</th>
-                                <th class="px-4 py-2 text-right">Peak (kW)</th>
+                                <th class="px-4 py-2">Start</th>
+                                <th class="px-4 py-2">End</th>
+                                <th class="px-4 py-2 text-center">Status</th>
+                                <th class="px-4 py-2">Phase Name</th>
+                                <th class="px-4 py-2 text-right">Dur</th>
                                 <th class="px-4 py-2 text-right">Avg (kW)</th>
-                                <th class="px-4 py-2 text-right">Energy (kWh)</th>
-                                <th class="px-4 py-2 text-right">Idle Gap</th>
-                                <th class="px-4 py-2 text-right text-error">Waste kW</th>
-                                <th class="px-4 py-2 text-right">Z-Score</th>
-                                <th class="px-4 py-2 text-center">Suspicion</th>
-                                <th class="px-4 py-2 text-right">Action</th>
+                                <th class="px-4 py-2 text-right">Peak (kW)</th>
+                                <th class="px-4 py-2 text-right">Usage (kWh)</th>
+                                <th class="px-4 py-2 text-right">Est. Cost</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-surface-container-low bg-white">
+                        <tbody class="divide-y divide-surface-container-low bg-white" id="phase-tbody">
                             <!-- Filled by JS -->
                         </tbody>
                     </table>
@@ -201,78 +216,53 @@
             </div>
         </div>
 
-        <!-- CYCLE DETAIL MODAL -->
-        <div id="cycle-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <div class="bg-white w-full max-w-md rounded-lg shadow-2xl border border-surface-container overflow-hidden">
-                <div class="px-6 py-4 bg-secondary text-on-secondary flex justify-between items-center">
-                    <div>
-                        <h3 class="text-xs font-black uppercase tracking-widest" id="cycle-modal-title">Cycle Detail</h3>
-                        <p class="text-[9px] opacity-80" id="cycle-modal-subtitle"></p>
-                    </div>
-                    <button onclick="closeCycleModal()" class="hover:bg-white/10 p-1 rounded-full transition-colors">
-                        <span class="material-symbols-outlined">close</span>
+        <!-- CREATE/EDIT OPERATIONAL TAG MODAL -->
+        <div id="tag-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-md transition-all animate-in fade-in duration-300">
+            <div class="bg-white w-full max-w-sm rounded shadow-2xl border border-surface-container overflow-hidden">
+                <div class="px-4 py-3 bg-surface-container-low/50 border-b border-surface-container flex justify-between items-center">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-outline" id="tag-modal-title">Create Operational Tag</h3>
+                    <button onclick="closeTagModal()" class="text-outline hover:text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
-                <div class="p-6">
-                    <div class="grid grid-cols-2 gap-6 mb-6">
-                        <div class="p-3 bg-surface-container-low rounded">
-                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Duration</span>
-                            <div class="text-xl font-black text-on-surface" id="cycle-detail-duration"></div>
-                        </div>
-                        <div class="p-3 bg-primary-container/20 rounded">
-                            <span class="text-[8px] font-black text-primary uppercase tracking-widest block mb-1">Total Energy</span>
-                            <div class="text-xl font-black text-primary" id="cycle-detail-energy"></div>
-                        </div>
-                        <div>
-                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Average Power</span>
-                            <div class="text-base font-bold text-on-surface" id="cycle-detail-avg"></div>
-                        </div>
-                        <div>
-                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Peak Power</span>
-                            <div class="text-base font-bold text-on-surface" id="cycle-detail-peak"></div>
-                        </div>
-                        <div>
-                            <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Idle Gap (Before)</span>
-                            <div class="text-base font-bold text-outline" id="cycle-detail-gap"></div>
-                        </div>
-                        <div class="p-3 bg-tertiary-container/10 rounded border border-tertiary/10">
-                            <span class="text-[8px] font-black text-tertiary uppercase tracking-widest block mb-1">Estimated Energy Cost</span>
-                            <div class="text-xl font-black text-tertiary" id="cycle-detail-cost"></div>
-                        </div>
-                        <div class="p-3 bg-error-container/5 rounded border border-error/10">
-                            <span class="text-[8px] font-black text-error uppercase tracking-widest block mb-1">Idle Cost Leakage</span>
-                            <div class="text-xl font-black text-error" id="cycle-detail-idle-cost"></div>
-                        </div>
-                        <div class="p-3 bg-error-container/10 rounded col-span-2 border border-error/10">
-                            <span class="text-[8px] font-black text-error uppercase tracking-widest block mb-1">Audit Metadata</span>
-                            <div class="grid grid-cols-2 gap-2 text-[10px]">
-                                <div class="text-outline">Threshold Source: <span class="font-bold text-on-surface" id="cycle-modal-thresh-source"></span></div>
-                                <div class="text-outline">Z-Score: <span class="font-bold text-on-surface" id="cycle-modal-zscore"></span></div>
-                                <div class="text-outline">Standby Baseline: <span class="font-bold text-on-surface" id="cycle-modal-standby"></span> kW</div>
-                                <div class="text-outline text-error">Waste Power: <span class="font-bold text-error" id="cycle-modal-waste"></span> kW</div>
-                            </div>
-                        </div>
+                <div class="p-4 space-y-3">
+                    <input type="hidden" id="tag-id" value="">
+                    
+                    <div>
+                        <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Selected Timestamp</label>
+                        <input type="text" id="tag-timestamp" class="w-full bg-surface-container-low text-xs px-2 py-1.5 rounded font-mono font-bold text-on-surface outline-none border border-surface-container" readonly>
+                        <p class="text-[8px] text-outline mt-0.5">Snapped to nearest telemetry reading.</p>
                     </div>
-                    <div id="cycle-suspicion-banner" class="mb-4 p-3 rounded flex items-center justify-between border">
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-lg" id="suspicion-icon">report</span>
-                            <div>
-                                <p class="text-[10px] font-black uppercase">Suspicion Audit: <span id="suspicion-label"></span></p>
-                                <p class="text-[9px] opacity-80">Security classification for forensic investigation.</p>
-                            </div>
-                        </div>
-                        <div class="text-xl font-black" id="suspicion-score-val"></div>
+
+                    <div>
+                        <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Event Type</label>
+                        <select id="tag-event-type" class="w-full bg-white text-xs px-2 py-1.5 rounded font-bold text-on-surface outline-none border border-surface-container focus:border-primary">
+                            <option value="start">Start (Furnace/Process starts)</option>
+                            <option value="melting">Melting (Active heating)</option>
+                            <option value="idle">Idle (Waiting/Hold condition)</option>
+                            <option value="test">Test (Spectro/Quality check)</option>
+                            <option value="pour">Pour (Pouring/Tapping process)</option>
+                            <option value="end">End (Production finished)</option>
+                        </select>
                     </div>
-                    <div id="cycle-anomaly-warning" class="hidden p-3 bg-error-container text-error rounded flex items-start gap-3 border border-error/20">
-                        <span class="material-symbols-outlined text-lg">warning</span>
-                        <div>
-                            <p class="text-[10px] font-black uppercase">Anomaly Detected</p>
-                            <p class="text-[11px] font-medium leading-tight mt-0.5">Cycle duration is significantly above average. Potential operational inefficiency.</p>
-                        </div>
+
+                    <div>
+                        <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Shift</label>
+                        <select id="tag-shift" class="w-full bg-white text-xs px-2 py-1.5 rounded font-bold text-on-surface outline-none border border-surface-container focus:border-primary">
+                            <option value="1">Shift 1</option>
+                            <option value="2">Shift 2</option>
+                            <option value="3">Shift 3</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Notes (Optional)</label>
+                        <textarea id="tag-notes" class="w-full bg-white text-xs px-2 py-1.5 rounded font-medium text-on-surface outline-none border border-surface-container focus:border-primary h-16 resize-none" placeholder="Add operator notes..."></textarea>
                     </div>
                 </div>
-                <div class="px-6 py-4 bg-surface-container-low border-t border-surface-container">
-                    <button onclick="closeCycleModal()" class="w-full py-2.5 bg-secondary text-on-secondary font-black rounded text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-md">Close Drilldown</button>
+                <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container flex gap-2 justify-end">
+                    <button id="btn-delete-tag" class="hidden px-4 py-2 bg-error-container text-error font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Delete</button>
+                    <button onclick="saveTag()" class="px-4 py-2 bg-primary text-white font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Save Tag</button>
                 </div>
             </div>
         </div>
@@ -465,6 +455,8 @@
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
 <script src="{{ asset('assets/js/chartjs-plugin-annotation.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
@@ -577,7 +569,7 @@
                 start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
             }
 
-            fetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+            return fetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(res => res.json())
                 .then(response => {
                     const data = response.data || [];
@@ -803,25 +795,32 @@
                             max: 600
                         },
                         x: { 
-                            type: 'category',
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'dd/MM HH:mm',
+                                displayFormats: {
+                                    hour: 'HH:mm',
+                                    day: 'dd/MM HH:mm'
+                                }
+                            },
                             grid: { display: false }, 
                             ticks: { 
                                 font: { size: 9 }, 
                                 maxRotation: 0, 
                                 autoSkip: true, 
-                                maxTicksLimit: 8,
-                                callback: function(val, index) {
-                                    const label = this.getLabelForValue(val);
-                                    const d = new Date(label);
-                                    if (currentHours > 24) {
-                                        return d.getDate().toString().padStart(2, '0') + '/' + (d.getMonth() + 1).toString().padStart(2, '0');
-                                    }
-                                    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-                                }
+                                maxTicksLimit: 8
                             } 
                         }
                     },
-                    interaction: { intersect: false }
+                    interaction: { intersect: false },
+                    onClick: (e) => {
+                        const points = chartInstance.getElementsAtEventForMode(e, 'nearest', { intersect: false }, true);
+                        if (points.length) {
+                            const firstPoint = points[0];
+                            const label = chartInstance.data.labels[firstPoint.index];
+                            if(typeof openTagModal === 'function') openTagModal(label);
+                        }
+                    }
                 }
             });
         } catch (error) {
@@ -840,15 +839,25 @@
         let lastPage = 1;
         const machineId = "{{ $machine->id }}";
 
-        try {
-            fetchAndRender();
-        } catch (e) { console.error('Initial Chart Load Failed:', e); }
+        // Async Flow Refactor
+        async function initDashboard() {
+            try {
+                await fetchAndRender();
+                await window.refreshTags();
+                await window.refreshPhases();
+            } catch (e) {
+                console.error('Dashboard Init Failed:', e);
+            }
 
-        // Telemetry Logic (Isolated)
-        try {
-            fetchReadings(1);
-        } catch (e) { console.error('Initial Telemetry Load Failed:', e); }
+            try {
+                await fetchReadings(1);
+            } catch (e) {
+                console.error('Initial Telemetry Load Failed:', e);
+            }
+        }
         
+        // Execute deterministic init
+        initDashboard();
         function formatTimestamp(isoString) {
             const d = new Date(isoString);
             const yyyy = d.getFullYear();
@@ -1042,241 +1051,299 @@
                 } catch (err) { alert('❌ Error: ' + err.message); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
             });
         }
-        // --- CYCLE ANALYZER JS ---
-        const btnAnalyze = document.getElementById('btn-analyze-cycles');
-        const cycleSection = document.getElementById('cycle-analyzer-section');
-        const cycleTableBody = document.querySelector('#cycle-table tbody');
-        const cycleSummaryChips = document.getElementById('cycle-summary-chips');
+        // --- MANUAL TAGGING JS ---
+        const phaseSection = document.getElementById('phase-reconstruction-section');
+        const phaseTableBody = document.getElementById('phase-tbody');
+        const tagModal = document.getElementById('tag-modal');
+        let currentTags = [];
         
-        let activeCycles = [];
-        let audit_data_source = 'N/A';
-
-        function suspicionColor(level) {
-            switch(level) {
-                case 'critical': return 'bg-error text-on-error';
-                case 'suspicious': return 'bg-orange-500 text-white';
-                case 'watch': return 'bg-yellow-400 text-on-surface';
-                default: return 'bg-primary-container text-on-primary-container';
+        window.openTagModal = function(timestamp, tagData = null) {
+            document.getElementById('tag-timestamp').value = formatTimestamp(timestamp);
+            if (tagData) {
+                document.getElementById('tag-id').value = tagData.id;
+                document.getElementById('tag-event-type').value = tagData.event_type;
+                document.getElementById('tag-shift').value = tagData.shift || '1';
+                document.getElementById('tag-notes').value = tagData.notes || '';
+                document.getElementById('tag-modal-title').innerText = 'Edit Operational Tag';
+                document.getElementById('btn-delete-tag').classList.remove('hidden');
+                document.getElementById('btn-delete-tag').onclick = () => deleteTag(tagData.id);
+            } else {
+                document.getElementById('tag-id').value = '';
+                document.getElementById('tag-event-type').value = 'start';
+                document.getElementById('tag-shift').value = '1';
+                document.getElementById('tag-notes').value = '';
+                document.getElementById('tag-modal-title').innerText = 'Create Operational Tag';
+                document.getElementById('btn-delete-tag').classList.add('hidden');
             }
-        }
+            tagModal.classList.remove('hidden');
+        };
 
-        function suspicionBannerColor(level) {
-            switch(level) {
-                case 'critical': return 'bg-error/10 border-error/20 text-error';
-                case 'suspicious': return 'bg-orange-50 border-orange-200 text-orange-700';
-                case 'watch': return 'bg-yellow-50 border-yellow-200 text-yellow-700';
-                default: return 'bg-surface-container-low border-surface-container text-on-surface-variant';
-            }
-        }
+        window.closeTagModal = function() {
+            tagModal.classList.add('hidden');
+        };
 
-        if (btnAnalyze) {
-            btnAnalyze.addEventListener('click', function() {
-                // Determine current range from chart
-                let end = new Date();
-                let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
-                
-                // If forensic filter is active, use those dates
-                if (currentFilters.start && currentFilters.end) {
-                    start = new Date(currentFilters.start);
-                    end = new Date(currentFilters.end);
-                }
+        window.saveTag = async function() {
+            const btnSave = document.querySelector('#tag-modal button[onclick="saveTag()"]');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span class="animate-spin material-symbols-outlined text-[10px]">sync</span> Saving...';
 
-                this.disabled = true;
-                this.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm">sync</span> Analyzing...';
-
-                fetch(`{{ route('analytics.power.cycles') }}?device_id=${deviceId}&start=${start.toISOString()}&end=${end.toISOString()}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        this.disabled = false;
-                        this.innerHTML = '<span class="material-symbols-outlined text-sm">analytics</span> Analyze Cycles';
-                        
-                        if (data.cycles.length === 0) {
-                            alert('No cycles detected for the selected range.');
-                            return;
-                        }
-
-                        activeCycles = data.cycles;
-                        audit_data_source = data.threshold_source;
-                        renderCycleData(data);
-                        drawCycleAnnotations(data);
-                        
-                        cycleSection.classList.remove('hidden');
-                        cycleSection.scrollIntoView({ behavior: 'smooth' });
-                    })
-                    .catch(err => {
-                        this.disabled = false;
-                        this.innerHTML = '<span class="material-symbols-outlined text-sm">analytics</span> Analyze Cycles';
-                        console.error('Cycle analysis failed:', err);
-                        alert('Analysis failed. Check console for details.');
-                    });
-            });
-        }
-
-        function renderCycleData(data) {
-            // Render Summary Chips
-            cycleSummaryChips.innerHTML = `
-                <div class="px-2 py-1 bg-secondary/10 text-secondary text-[9px] font-black rounded border border-secondary/20">TOTAL: ${data.summary.total_cycles}</div>
-                <div class="px-2 py-1 bg-primary/10 text-primary text-[9px] font-black rounded border border-primary/20">AVG DUR: ${data.summary.avg_duration}m</div>
-                <div class="px-2 py-1 bg-tertiary/10 text-tertiary text-[9px] font-black rounded border border-primary/20">AVG GAP: ${data.summary.avg_idle_gap}m</div>
-            `;
-
-            // Render Table
-            cycleTableBody.innerHTML = '';
-            data.cycles.forEach(c => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-surface-container-low transition-colors cursor-pointer';
-                tr.onclick = () => openCycleDetail(c.cycle_number - 1);
-                
-                const startTime = new Date(c.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const endTime = new Date(c.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                tr.innerHTML = `
-                    <td class="px-4 py-3 text-center font-black text-outline">${c.cycle_number}</td>
-                    <td class="px-4 py-3 font-mono">${startTime} - ${endTime}</td>
-                    <td class="px-4 py-3 text-right font-black text-on-surface">${c.duration_minutes}m</td>
-                    <td class="px-4 py-3 text-right text-outline">${Math.round(c.peak_kw)}</td>
-                    <td class="px-4 py-3 text-right text-outline">${Math.round(c.avg_kw)}</td>
-                    <td class="px-4 py-3 text-right font-black text-primary">${c.energy_estimate_kwh.toFixed(1)}</td>
-                    <td class="px-4 py-3 text-right text-outline">${c.idle_gap_minutes}m</td>
-                    <td class="px-4 py-3 text-right font-black text-error">${c.waste_kw}</td>
-                    <td class="px-4 py-3 text-right text-outline">${c.z_score}</td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase shadow-sm ${suspicionColor(c.suspicion_level)}">
-                            ${c.suspicion_level} (${c.suspicion_score})
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-secondary font-black hover:underline uppercase tracking-widest text-[8px]">Drilldown</button>
-                    </td>
-                `;
-                cycleTableBody.appendChild(tr);
-            });
-        }
-
-        function drawCycleAnnotations(data) {
-            try {
-                if (!chartInstance) return;
-
-                // Get existing annotations safely
-                const currentAnnotations = chartInstance.options.plugins.annotation.annotations || {};
-                
-                // Clear previous cycle annotations
-                Object.keys(currentAnnotations).forEach(key => {
-                    if (key.startsWith('cycle_')) delete currentAnnotations[key];
-                });
-                
-                const labels = chartInstance.data.labels;
-
-                data.cycles.forEach(c => {
-                    const cycleKey = `cycle_${c.cycle_number}`;
-                    
-                    // Robust Mapping: Find index by proximity or exact match
-                    const findClosestIndex = (targetIso) => {
-                        const targetTime = new Date(targetIso).getTime();
-                        let closestIdx = -1;
-                        let minDiff = Infinity;
-                        
-                        for (let i = 0; i < labels.length; i++) {
-                            const labelTime = new Date(labels[i]).getTime();
-                            const diff = Math.abs(labelTime - targetTime);
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                closestIdx = i;
-                            }
-                        }
-                        // Only match if within 15 minutes (telemetry window)
-                        return minDiff < 900000 ? labels[closestIdx] : null;
-                    };
-
-                    const xMinVal = findClosestIndex(c.start_time);
-                    const xMaxVal = findClosestIndex(c.end_time);
-
-                    if (xMinVal && xMaxVal) {
-                        currentAnnotations[cycleKey] = {
-                            type: 'box',
-                            xMin: xMinVal,
-                            xMax: xMaxVal,
-                            yMin: 0,
-                            yMax: c.peak_kw,
-                            backgroundColor: c.abnormal ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                            borderColor: c.abnormal ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)',
-                            borderWidth: 1,
-                            label: {
-                                display: true,
-                                content: [`#${c.cycle_number}`, `${c.duration_minutes}m`],
-                                position: 'start',
-                                color: c.abnormal ? '#ef4444' : '#10b981',
-                                font: { size: 9, weight: 'bold' },
-                                padding: 4
-                            }
-                        };
-                    } else {
-                        console.warn(`Cycle #${c.cycle_number} out of chart range:`, c.start_time);
-                    }
-                });
-
-                chartInstance.options.plugins.annotation.annotations = currentAnnotations;
-                chartInstance.update();
-            } catch (error) {
-                console.error('Cycle Annotation Error:', error);
-            }
-        }
-
-        window.openCycleDetail = function(index) {
-            const cycle = activeCycles[index];
-            if (!cycle) return;
-
-            const setText = (id, text) => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = text;
+            const id = document.getElementById('tag-id').value;
+            const data = {
+                event_time: document.getElementById('tag-timestamp').value,
+                event_type: document.getElementById('tag-event-type').value,
+                shift: document.getElementById('tag-shift').value,
+                notes: document.getElementById('tag-notes').value
             };
 
-            setText('cycle-modal-title', `Cycle #${cycle.cycle_number} Details`);
-            setText('cycle-modal-subtitle', `${new Date(cycle.start_time).toLocaleString()} - ${new Date(cycle.end_time).toLocaleTimeString()}`);
-            
-            setText('cycle-detail-duration', `${cycle.duration_minutes}m`);
-            setText('cycle-detail-energy', `${cycle.energy_estimate_kwh.toFixed(2)} kWh`);
-            setText('cycle-detail-avg', `${cycle.avg_kw.toFixed(1)} kW`);
-            setText('cycle-detail-peak', `${cycle.peak_kw.toFixed(1)} kW`);
-            setText('cycle-detail-gap', `${cycle.idle_gap_minutes}m`);
-            
-            // Estimated Cost (Mock tariff 1444.7)
-            const cost = cycle.energy_estimate_kwh * 1444.7;
-            setText('cycle-detail-cost', `Rp ${Math.round(cost).toLocaleString()}`);
-            
-            // Idle Leakage
-            setText('cycle-detail-idle-cost', `Rp ${cycle.idle_cost_loss.toLocaleString()}`);
-            
-            // Audit Metadata
-            setText('cycle-modal-thresh-source', audit_data_source);
-            setText('cycle-modal-zscore', cycle.z_score);
-            setText('cycle-modal-standby', cycle.standby_baseline_kw);
-            setText('cycle-modal-waste', cycle.waste_kw);
-
-            // Suspicion Banner
-            const banner = document.getElementById('cycle-suspicion-banner');
-            const scoreVal = document.getElementById('suspicion-score-val');
-            const labelEl = document.getElementById('suspicion-label');
-
-            if (banner && scoreVal && labelEl) {
-                banner.className = `mb-4 p-3 rounded flex items-center justify-between border ${suspicionBannerColor(cycle.suspicion_level)}`;
-                scoreVal.innerText = cycle.suspicion_score;
-                labelEl.innerText = cycle.suspicion_level.toUpperCase();
+            try {
+                const url = id ? `/api/tags/${id}` : `/api/machines/${machineId}/tags`;
+                const method = id ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' 
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    closeTagModal();
+                    await window.refreshTags();
+                    await window.refreshPhases();
+                } else {
+                    if (result.status === 'VALID_WITH_WARNING') {
+                        if(confirm('Warning: ' + result.message + '\n\nDo you want to proceed anyway?')) {
+                            data.force = true;
+                            // Retry with force
+                            const retryResponse = await fetch(url, {
+                                method: method,
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                                body: JSON.stringify(data)
+                            });
+                            if (retryResponse.ok) {
+                                closeTagModal();
+                                await window.refreshTags();
+                                await window.refreshPhases();
+                            } else {
+                                alert((await retryResponse.json()).message || 'Validation failed.');
+                            }
+                        }
+                    } else {
+                        alert(result.message || 'Validation failed.');
+                    }
+                }
+            } catch (e) {
+                alert('Error saving tag.');
+                console.error(e);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerText = 'SAVE TAG';
             }
-            
-            const warning = document.getElementById('cycle-anomaly-warning');
-            if (warning) {
-                if (cycle.abnormal) warning.classList.remove('hidden');
-                else warning.classList.add('hidden');
-            }
-
-            const modal = document.getElementById('cycle-modal');
-            if (modal) modal.classList.remove('hidden');
         };
 
-        window.closeCycleModal = function() {
-            document.getElementById('cycle-modal').classList.add('hidden');
+        window.deleteTag = async function(id) {
+            if (!confirm('Are you sure you want to delete this tag?')) return;
+            try {
+                const response = await fetch(`/api/tags/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+                });
+                if (response.ok) {
+                    closeTagModal();
+                    await window.refreshTags();
+                    await window.refreshPhases();
+                }
+            } catch (e) {
+                alert('Error deleting tag.');
+            }
         };
+
+        window.refreshTags = async function() {
+            let end = new Date();
+            let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+            
+            if (currentFilters.start && currentFilters.end) {
+                start = new Date(currentFilters.start);
+                end = new Date(currentFilters.end);
+            }
+
+            try {
+                const tagsRes = await fetch(`/api/machines/${machineId}/tags?start=${start.toISOString()}&end=${end.toISOString()}`);
+                const tags = await tagsRes.json();
+                currentTags = tags;
+                drawTagAnnotations(tags);
+                renderTimeline(tags);
+            } catch (e) {
+                console.error("Error fetching tags", e);
+            }
+        };
+
+        function renderTimeline(tags) {
+            const container = document.getElementById('timeline-content');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            if(tags.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-outline italic">No operational tags found.</div>';
+                return;
+            }
+
+            tags.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'p-2 rounded border border-surface-container bg-white shadow-sm hover:bg-surface-container-lowest cursor-pointer transition-colors';
+                div.onclick = () => openTagModal(t.event_time, t);
+                
+                const timeStr = formatTimestamp(t.event_time).split(' ')[1];
+                const editedBadge = t.edited_at ? `<span class="px-1 py-0.5 ml-1 bg-surface-container-high text-[8px] rounded" title="Edited at ${formatTimestamp(t.edited_at)}">Edited</span>` : '';
+                
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-on-surface">${timeStr}</span>
+                        <span class="px-1.5 py-0.5 rounded text-white text-[8px] uppercase tracking-widest shadow-sm" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-outline text-[8px]">
+                        <span class="truncate pr-1">By: ${t.tagger ? t.tagger.name : 'System'}</span>
+                        ${editedBadge}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        window.refreshPhases = async function() {
+            let end = new Date();
+            let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+            
+            if (currentFilters.start && currentFilters.end) {
+                start = new Date(currentFilters.start);
+                end = new Date(currentFilters.end);
+            }
+
+            phaseTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><span class="animate-spin material-symbols-outlined">sync</span> Loading phases...</td></tr>';
+            try {
+                const phasesRes = await fetch(`/api/machines/${machineId}/phases?start=${start.toISOString()}&end=${end.toISOString()}`);
+                const phases = await phasesRes.json();
+                renderPhases(phases);
+            } catch (e) {
+                console.error("Error fetching phases", e);
+                phaseTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-error">Failed to load phases.</td></tr>';
+            }
+        };
+
+        function getEventColor(type) {
+            const colors = {
+                'start': 'rgba(16, 185, 129, 0.8)', // green
+                'melting': 'rgba(249, 115, 22, 0.8)', // orange
+                'idle': 'rgba(148, 163, 184, 0.8)', // slate
+                'test': 'rgba(234, 179, 8, 0.8)', // yellow
+                'pour': 'rgba(59, 130, 246, 0.8)', // blue
+                'end': 'rgba(239, 68, 68, 0.8)' // red
+            };
+            return colors[type] || 'rgba(148, 163, 184, 0.8)';
+        }
+
+        function drawTagAnnotations(tags) {
+            if (!chartInstance) return;
+            
+            const baseOptions = chartInstance.options.plugins.annotation || {};
+            let currentAnnotations = {};
+            
+            // Deep clone non-tag annotations to avoid mutating in-place
+            if (baseOptions.annotations) {
+                Object.keys(baseOptions.annotations).forEach(key => {
+                    if (!key.startsWith('tag_')) {
+                        currentAnnotations[key] = Object.assign({}, baseOptions.annotations[key]);
+                    }
+                });
+            }
+            
+            tags.forEach(t => {
+                currentAnnotations[`tag_${t.id}`] = {
+                    type: 'line',
+                    xMin: t.event_time,
+                    xMax: t.event_time,
+                    borderColor: getEventColor(t.event_type),
+                    borderWidth: 2,
+                    borderDash: [4, 4],
+                    label: {
+                        content: t.event_type.toUpperCase(),
+                        display: true,
+                        position: 'start',
+                        backgroundColor: getEventColor(t.event_type),
+                        color: '#fff',
+                        font: { size: 9, weight: 'bold' }
+                    },
+                    enter(ctx, event) {
+                        ctx.chart.canvas.style.cursor = 'pointer';
+                    },
+                    leave(ctx, event) {
+                        ctx.chart.canvas.style.cursor = 'default';
+                    },
+                    click(ctx, event) {
+                        openTagModal(t.event_time, t);
+                    }
+                };
+            });
+
+            chartInstance.options.plugins.annotation.annotations = currentAnnotations;
+            chartInstance.update();
+        }
+
+        function renderPhases(phases) {
+            phaseTableBody.innerHTML = '';
+            if (phases.length > 0) {
+                phaseSection.classList.remove('hidden');
+                
+                // Summaries
+                let totalDur = 0;
+                let totalUsage = 0;
+                let totalPhases = phases.length;
+
+                phases.forEach(p => {
+                    totalDur += p.duration_minutes;
+                    totalUsage += p.usage_kwh;
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = p.status === 'OPEN' ? 'bg-primary/5 hover:bg-primary/10 transition-colors' : 'hover:bg-surface-container-low transition-colors bg-white';
+                    
+                    const statusHtml = p.status === 'OPEN' 
+                        ? '<span class="px-2 py-0.5 bg-primary/20 text-primary rounded font-black text-[8px] animate-pulse">IN PROGRESS</span>'
+                        : '<span class="px-2 py-0.5 bg-surface-container-high text-outline rounded font-black text-[8px]">CLOSED</span>';
+                        
+                    tr.innerHTML = `
+                        <td class="px-4 py-2 font-mono text-outline">${formatTimestamp(p.start_time).split(' ')[1]}</td>
+                        <td class="px-4 py-2 font-mono text-outline">${formatTimestamp(p.end_time).split(' ')[1]}</td>
+                        <td class="px-4 py-2 text-center">${statusHtml}</td>
+                        <td class="px-4 py-2 font-black uppercase text-primary">${p.phase_name}</td>
+                        <td class="px-4 py-2 text-right font-black">${p.duration_minutes}m</td>
+                        <td class="px-4 py-2 text-right text-outline">${p.avg_kw}</td>
+                        <td class="px-4 py-2 text-right text-outline">${p.peak_kw}</td>
+                        <td class="px-4 py-2 text-right font-black text-on-surface">${p.usage_kwh}</td>
+                        <td class="px-4 py-2 text-right font-black text-tertiary">Rp ${p.est_cost.toLocaleString()}</td>
+                    `;
+                    phaseTableBody.appendChild(tr);
+                });
+                
+                // Add Summary Row
+                const summaryTr = document.createElement('tr');
+                summaryTr.className = 'bg-surface-container-low font-black text-[10px] text-on-surface uppercase';
+                summaryTr.innerHTML = `
+                    <td colspan="4" class="px-4 py-2 text-right">TOTALS (${totalPhases} PHASES)</td>
+                    <td class="px-4 py-2 text-right text-primary">${totalDur}m</td>
+                    <td colspan="2" class="px-4 py-2 text-right"></td>
+                    <td class="px-4 py-2 text-right text-primary">${totalUsage.toFixed(2)} kWh</td>
+                    <td class="px-4 py-2 text-right"></td>
+                `;
+                phaseTableBody.appendChild(summaryTr);
+                
+            } else {
+                phaseSection.classList.add('hidden');
+            }
+        }
+        // Intentionally left blank, initialization handled by initDashboard();
 
     });
 </script>
