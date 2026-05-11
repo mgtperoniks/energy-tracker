@@ -1,5 +1,4 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.framer import ModbusRtuFramer, ModbusSocketFramer
 import requests
 import time
 import os
@@ -169,8 +168,8 @@ def read_int64(client, address, slave):
 def poll_meter():
     global LAST_KWH_READING, LAST_POLL_TIME, LAST_METER_BOOT_ID, LAST_TELEMETRY, STALE_COUNT, OFFLINE_COUNT
     
-    framer = ModbusSocketFramer if MODBUS_FRAMER == 'socket' else ModbusRtuFramer
-    client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5, framer=framer)
+    # In Pymodbus 3.x, ModbusTcpClient accepts 'rtu' or 'socket' as framer string
+    client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5, framer=MODBUS_FRAMER)
     
     if not client.connect():
         print("[{}] STATUS: OFFLINE (Cannot connect to {}:{})".format(get_log_ts(), MODBUS_IP, MODBUS_PORT), flush=True)
