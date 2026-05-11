@@ -288,6 +288,25 @@
             </div>
         </div>
 
+        <!-- Historian Health Panel -->
+        <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
+            <div class="px-3 py-1.5 border-b border-surface-container-low bg-surface-container-low/30 flex justify-between items-center">
+                <h2 class="text-[9px] font-black text-on-surface uppercase tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[10px]">monitor_heart</span>
+                    Historian Health Diagnostics
+                </h2>
+                <span id="health-last-refresh" class="text-[8px] font-mono text-outline">Waiting...</span>
+            </div>
+            <div class="p-2 flex flex-wrap gap-4 text-[9px] uppercase tracking-widest text-outline">
+                <div>Chart: <span id="health-chart" class="font-black text-on-surface">INIT</span></div>
+                <div>Tags: <span id="health-tags" class="font-black text-on-surface">0</span></div>
+                <div>Phases: <span id="health-phases" class="font-black text-on-surface">0</span></div>
+                <div>Telemetry: <span id="health-telemetry" class="font-black text-on-surface">0</span></div>
+                <div>Forensic: <span id="health-forensic" class="font-black text-on-surface">OFF</span></div>
+                <div>Mode: <span id="health-network" class="font-black text-primary">OFFLINE LAN</span></div>
+            </div>
+        </div>
+
         <!-- Raw Telemetry - Full Width Priority -->
         <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
             <div class="px-4 py-3 border-b border-surface-container-low flex justify-between items-center bg-surface-container-low/50">
@@ -455,19 +474,44 @@
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
 <script src="{{ asset('assets/js/chartjs-plugin-annotation.min.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="{{ asset('assets/vendor/date-fns/date-fns.min.js') }}"></script>
+<script src="{{ asset('assets/vendor/chartjs-adapter-date-fns/chartjs-adapter-date-fns.bundle.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
         let chartInstance = null;
+        let baseAnnotations = {};
         let currentHours = 12;
         let currentMetric = 'power';
         
-        const deviceId = {{ $machine->devices->first()?->id ?? 'null' }};
+        const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         if (!deviceId) {
             renderEmptyChart();
             return;
+        }
+
+        async function safeFetch(url, options = {}, retries = 1) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+                options.signal = controller.signal;
+
+                const response = await fetch(url, options);
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                if (retries > 0) {
+                    console.warn(`[SafeFetch] Retrying ${url}...`);
+                    return safeFetch(url, options, retries - 1);
+                }
+                console.error(`[SafeFetch] Failed: ${error.message}`);
+                throw error;
+            }
         }
 
         // UI bindings
@@ -487,6 +531,13 @@
         };
         const startPicker = flatpickr(forensicStart, fpConfig);
         const endPicker = flatpickr(forensicEnd, fpConfig);
+
+        function updateHealthPanel(key, val) {
+            const el = document.getElementById('health-' + key);
+            if (el) el.innerText = val;
+            const ref = document.getElementById('health-last-refresh');
+            if (ref) ref.innerText = 'Last Sync: ' + formatWIB(new Date().toISOString()).split(' ')[1];
+        }
 
         metricSelect.addEventListener('change', function(e) {
             currentMetric = e.target.value;
@@ -511,6 +562,7 @@
                 // Reset forensic filter state (Ghost Filter Fix)
                 currentFilters.start = null;
                 currentFilters.end = null;
+                updateHealthPanel('forensic', 'OFF');
 
                 // Reload historian global
                 fetchReadings(1);
@@ -551,6 +603,7 @@
             // Forensic Mode: Apply filter to both Chart AND Ledger
             currentFilters.start = start.toISOString();
             currentFilters.end = end.toISOString();
+            updateHealthPanel('forensic', 'ACTIVE');
             
             fetchAndRender(start, end);
             fetchReadings(1); // Manually refresh ledger ONLY on Forensic Search
@@ -569,8 +622,7 @@
                 start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
             }
 
-            return fetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
-                .then(res => res.json())
+            return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(response => {
                     const data = response.data || [];
                     renderChart(data);
@@ -587,8 +639,10 @@
             
             if (data.length === 0) {
                 renderEmptyChart();
+                updateHealthPanel('chart', 'EMPTY');
                 return;
             }
+            updateHealthPanel('chart', 'LOADED');
 
             const powerData = data.map(item =>
                 item.power_kw !== null ? Number(item.power_kw) : null
@@ -735,6 +789,10 @@
                 };
             }
 
+            baseAnnotations = window.structuredClone 
+                ? structuredClone(chartAnnotations) 
+                : JSON.parse(JSON.stringify(chartAnnotations));
+
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -756,7 +814,7 @@
                             callbacks: { 
                                 title: function(context) {
                                     const d = new Date(context[0].label);
-                                    return d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                                    return formatWIB(context[0].label).substring(5, 16);
                                 },
                                 label: function(context) {
                                     let label = context.dataset.label || '';
@@ -771,7 +829,9 @@
                             }
                         },
                         annotation: {
-                            annotations: chartAnnotations
+                            annotations: window.structuredClone 
+                                ? structuredClone(baseAnnotations) 
+                                : JSON.parse(JSON.stringify(baseAnnotations))
                         }
                     },
                     scales: {
@@ -830,8 +890,12 @@
     }
 
         function renderEmptyChart() {
-            if (chartInstance) chartInstance.destroy();
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
             chartInstance = new Chart(ctx, { type: 'line', data: { labels: ['No Data'], datasets: [] }, options: { maintainAspectRatio: false } });
+            updateHealthPanel('chart', 'NO DATA');
         }
 
         // Telemetry Global State
@@ -841,31 +905,24 @@
 
         // Async Flow Refactor
         async function initDashboard() {
-            try {
-                await fetchAndRender();
-                await window.refreshTags();
-                await window.refreshPhases();
-            } catch (e) {
-                console.error('Dashboard Init Failed:', e);
-            }
-
-            try {
-                await fetchReadings(1);
-            } catch (e) {
-                console.error('Initial Telemetry Load Failed:', e);
-            }
+            await fetchAndRender();
+            await window.refreshTags();
+            await window.refreshPhases();
+            await fetchReadings(1);
         }
         
         // Execute deterministic init
         initDashboard();
-        function formatTimestamp(isoString) {
+        function formatWIB(isoString) {
             const d = new Date(isoString);
-            const yyyy = d.getFullYear();
-            const mm   = String(d.getMonth() + 1).padStart(2, '0');
-            const dd   = String(d.getDate()).padStart(2, '0');
-            const hh   = String(d.getHours()).padStart(2, '0');
-            const min  = String(d.getMinutes()).padStart(2, '0');
-            const ss   = String(d.getSeconds()).padStart(2, '0');
+            const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+            const nd = new Date(utc + (3600000 * 7)); // +7 for WIB
+            const yyyy = nd.getFullYear();
+            const mm   = String(nd.getMonth() + 1).padStart(2, '0');
+            const dd   = String(nd.getDate()).padStart(2, '0');
+            const hh   = String(nd.getHours()).padStart(2, '0');
+            const min  = String(nd.getMinutes()).padStart(2, '0');
+            const ss   = String(nd.getSeconds()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
         }
 
@@ -882,14 +939,12 @@
                 if (currentFilters.start && currentFilters.end) {
                     url += `&start_date=${encodeURIComponent(currentFilters.start)}&end_date=${encodeURIComponent(currentFilters.end)}`;
                 }
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const result = await response.json();
+                const result = await safeFetch(url);
 
                 if (result.status === 'success') {
                     const paginator = result.data;
                     const readings = paginator.data;
+                    updateHealthPanel('telemetry', paginator.total);
                     
                     if (tbody) {
                         tbody.innerHTML = '';
@@ -903,7 +958,7 @@
                         const tr = document.createElement('tr');
                         tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
                         const power = parseFloat(row.power_kw);
-                        const timestamp = formatTimestamp(row.recorded_at);
+                        const timestamp = formatWIB(row.recorded_at);
                         const statusHtml = row.status_badge;
 
                         tr.innerHTML = `
@@ -1040,13 +1095,13 @@
                 const notes = prompt('Catatan (opsional):');
                 this.disabled = true; this.innerText = 'SAVING...';
                 try {
-                    const response = await fetch(`/api/machines/${machineId}/reset`, {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+                    const result = await safeFetch(`/api/machines/${machineId}/reset`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
                         body: JSON.stringify({ notes: notes || '' })
                     });
-                    const result = await response.json();
-                    if (response.ok && result.status === 'success') { alert(`✅ Berhasil!`); window.location.reload(); }
+                    if (result.status === 'success') { alert(`✅ Berhasil!`); window.location.reload(); }
                     else { alert('❌ Gagal: ' + (result.message || 'Error')); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
                 } catch (err) { alert('❌ Error: ' + err.message); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
             });
@@ -1058,7 +1113,7 @@
         let currentTags = [];
         
         window.openTagModal = function(timestamp, tagData = null) {
-            document.getElementById('tag-timestamp').value = formatTimestamp(timestamp);
+            document.getElementById('tag-timestamp').value = formatWIB(timestamp);
             if (tagData) {
                 document.getElementById('tag-id').value = tagData.id;
                 document.getElementById('tag-event-type').value = tagData.event_type;
@@ -1098,12 +1153,19 @@
             try {
                 const url = id ? `/api/tags/${id}` : `/api/machines/${machineId}/tags`;
                 const method = id ? 'PUT' : 'POST';
+                const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+                
+                // Wrap safeFetch but we need to handle 422 validations inside the safeFetch logic
+                // Wait, safeFetch throws an error if response.ok is false! We need the JSON body.
+                // It's better to just use raw fetch here for validation handling or adjust safeFetch.
+                // Since safeFetch throws on !response.ok, and we need `result.status === 'VALID_WITH_WARNING'`,
+                // let's just use raw fetch for saveTag because we need specific 422 JSON handling.
                 const response = await fetch(url, {
                     method: method,
                     headers: { 
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' 
+                        'X-CSRF-TOKEN': csrfToken 
                     },
                     body: JSON.stringify(data)
                 });
@@ -1120,7 +1182,7 @@
                             // Retry with force
                             const retryResponse = await fetch(url, {
                                 method: method,
-                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
                                 body: JSON.stringify(data)
                             });
                             if (retryResponse.ok) {
@@ -1147,9 +1209,10 @@
         window.deleteTag = async function(id) {
             if (!confirm('Are you sure you want to delete this tag?')) return;
             try {
+                const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
                 const response = await fetch(`/api/tags/${id}`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+                    headers: { 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (response.ok) {
                     closeTagModal();
@@ -1171,9 +1234,9 @@
             }
 
             try {
-                const tagsRes = await fetch(`/api/machines/${machineId}/tags?start=${start.toISOString()}&end=${end.toISOString()}`);
-                const tags = await tagsRes.json();
+                const tags = await safeFetch(`/api/machines/${machineId}/tags?start=${start.toISOString()}&end=${end.toISOString()}`);
                 currentTags = tags;
+                updateHealthPanel('tags', tags.length);
                 drawTagAnnotations(tags);
                 renderTimeline(tags);
             } catch (e) {
@@ -1196,8 +1259,8 @@
                 div.className = 'p-2 rounded border border-surface-container bg-white shadow-sm hover:bg-surface-container-lowest cursor-pointer transition-colors';
                 div.onclick = () => openTagModal(t.event_time, t);
                 
-                const timeStr = formatTimestamp(t.event_time).split(' ')[1];
-                const editedBadge = t.edited_at ? `<span class="px-1 py-0.5 ml-1 bg-surface-container-high text-[8px] rounded" title="Edited at ${formatTimestamp(t.edited_at)}">Edited</span>` : '';
+                const timeStr = formatWIB(t.event_time).split(' ')[1];
+                const editedBadge = t.edited_at ? `<span class="px-1 py-0.5 ml-1 bg-surface-container-high text-[8px] rounded" title="Edited at ${formatWIB(t.edited_at)}">Edited</span>` : '';
                 
                 div.innerHTML = `
                     <div class="flex justify-between items-center mb-1">
@@ -1224,8 +1287,8 @@
 
             phaseTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><span class="animate-spin material-symbols-outlined">sync</span> Loading phases...</td></tr>';
             try {
-                const phasesRes = await fetch(`/api/machines/${machineId}/phases?start=${start.toISOString()}&end=${end.toISOString()}`);
-                const phases = await phasesRes.json();
+                const phases = await safeFetch(`/api/machines/${machineId}/phases?start=${start.toISOString()}&end=${end.toISOString()}`);
+                updateHealthPanel('phases', phases.length);
                 renderPhases(phases);
             } catch (e) {
                 console.error("Error fetching phases", e);
@@ -1248,17 +1311,9 @@
         function drawTagAnnotations(tags) {
             if (!chartInstance) return;
             
-            const baseOptions = chartInstance.options.plugins.annotation || {};
-            let currentAnnotations = {};
-            
-            // Deep clone non-tag annotations to avoid mutating in-place
-            if (baseOptions.annotations) {
-                Object.keys(baseOptions.annotations).forEach(key => {
-                    if (!key.startsWith('tag_')) {
-                        currentAnnotations[key] = Object.assign({}, baseOptions.annotations[key]);
-                    }
-                });
-            }
+            const currentAnnotations = window.structuredClone 
+                ? structuredClone(baseAnnotations || {}) 
+                : JSON.parse(JSON.stringify(baseAnnotations || {}));
             
             tags.forEach(t => {
                 currentAnnotations[`tag_${t.id}`] = {
@@ -1314,8 +1369,8 @@
                         : '<span class="px-2 py-0.5 bg-surface-container-high text-outline rounded font-black text-[8px]">CLOSED</span>';
                         
                     tr.innerHTML = `
-                        <td class="px-4 py-2 font-mono text-outline">${formatTimestamp(p.start_time).split(' ')[1]}</td>
-                        <td class="px-4 py-2 font-mono text-outline">${formatTimestamp(p.end_time).split(' ')[1]}</td>
+                        <td class="px-4 py-2 font-mono text-outline">${formatWIB(p.start_time).split(' ')[1]}</td>
+                        <td class="px-4 py-2 font-mono text-outline">${formatWIB(p.end_time).split(' ')[1]}</td>
                         <td class="px-4 py-2 text-center">${statusHtml}</td>
                         <td class="px-4 py-2 font-black uppercase text-primary">${p.phase_name}</td>
                         <td class="px-4 py-2 text-right font-black">${p.duration_minutes}m</td>

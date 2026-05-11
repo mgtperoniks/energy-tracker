@@ -4,342 +4,285 @@ import time
 import os
 import struct
 import math
-import math
-import uuid
+import sys
+import json
+import gc
+import glob
 from datetime import datetime
 
+# Linux-only locking
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 # --- CONFIGURATION (via Environment Variables) ---
-MODBUS_IP         = os.getenv('MODBUS_IP', '10.88.8.16')
-MODBUS_PORT       = int(os.getenv('MODBUS_PORT', 502))
-PHYSICAL_SLAVE_ID = int(os.getenv('MODBUS_SLAVE_ID', 1))
-REPORT_AS_SLAVE_ID = int(os.getenv('REPORT_AS_SLAVE_ID', 3))
-LARAVEL_API_URL   = os.getenv('MODBUS_API_URL', 'http://web/api/readings')
-DEVICE_TOKEN      = os.getenv('DEVICE_TOKEN', '') # Required for authentication
-INTERVAL_SECONDS  = int(os.getenv('POLLING_INTERVAL', 600))  # Default 10 minutes
+MODBUS_IP           = os.getenv('MODBUS_IP', '10.88.8.16')
+MODBUS_PORT         = int(os.getenv('MODBUS_PORT', 502))
+PHYSICAL_SLAVE_ID   = int(os.getenv('MODBUS_SLAVE_ID', 3))
+REPORT_AS_SLAVE_ID  = int(os.getenv('REPORT_AS_SLAVE_ID', 3))
+METER_BOOT_ID       = os.getenv('METER_BOOT_ID', 'PM3-DEFAULT')
+LARAVEL_API_URL     = os.getenv('MODBUS_API_URL', 'http://localhost/api/readings')
+DEVICE_TOKEN        = os.getenv('DEVICE_TOKEN', '') 
+INTERVAL_SECONDS    = int(os.getenv('POLLING_INTERVAL', 300))
+DEBUG_RAW_REGISTERS = os.getenv('DEBUG_RAW_REGISTERS', 'false').lower() == 'true'
 
-# --- GLOBAL STATE (Local session) ---
-LAST_KWH_READING = None
-LAST_POLL_TIME    = None
+# --- FILE PATHS ---
+LOCK_FILE      = "/tmp/modbus_slave_{}.lock".format(PHYSICAL_SLAVE_ID)
+BUFFER_DIR     = "storage/offline-buffer"
+HEARTBEAT_FILE = "storage/poller-heartbeat-slave-{}.json".format(PHYSICAL_SLAVE_ID)
 
-# --- VALIDATION CONSTANTS ---
-MAX_KW_CAPACITY = 400.0  # Furnace max load
-GROWTH_THRESHOLD_KWH_PER_MIN = 10.0 # 1.5x max capacity for safety margin
+# --- GLOBAL STATE ---
+LAST_KWH_READING    = None
+LAST_POLL_TIME      = None
+LAST_METER_BOOT_ID  = None
+LAST_TELEMETRY      = None
+STALE_COUNT         = 0
+OFFLINE_COUNT       = 0
+STALE_THRESHOLD     = 6
+RECOVERY_THRESHOLD  = 5
 
-# --- LOGGING UTILS ---
-SESSION_ID = str(uuid.uuid4())[:8]
-LOG_TS = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# --- REGISTER MAP (Validated) ---
+REG_TOTAL_WH  = 3203   # INT64, 4 registers, Wh
+REG_AVG_VOLT  = 3025   # Float32, 2 registers, V
+REG_AVG_AMP   = 3009   # Float32, 2 registers, A
+REG_TOTAL_KW  = 3059   # Float32, 2 registers, kW
+REG_PF        = 3083   # Float32, 2 registers, PF
 
+def get_log_ts():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# --- REGISTER MAP (PM2200 EasyLogic) ---
-# Source: Schneider Electric PM2200 Modbus Communication Guide
-#
-# IMPORTANT: Register 3203 = Active Energy Delivered (E Del)
-#   - Data Type : INT64 (4 x 16-bit registers = 8 bytes)
-#   - Unit      : Wh (Watt-hours) → must divide by 1000 to get kWh
-#   - Endian    : Big-Endian (ABCD EFGH word order)
-#
-# Other registers (power, voltage, current, PF):
-#   - Data Type : Float32 (2 x 16-bit registers)
-#   - Endian    : Big-Endian (ABCD)
-#
-REG_TOTAL_WH  = 3203   # INT64, 4 registers, unit: Wh
-REG_AVG_VOLT  = 3025   # CHANGED to 3025 (Voltage L-L Avg) for PM2220
-REG_AVG_AMP   = 3009   # CHANGED to 3009 (Current Average) for PM2220
-REG_TOTAL_KW  = 3059   # Active Power Total
-REG_PF        = 3083   # Power Factor Total
-
-# --- PM2220 HARDWARE CONSTANTS ---
-CT_RATIO = 120.0  # 600/5
-
-# --- CANDIDATE REGISTERS FOR VOLTAGE COMPARISON ---
-VOLTAGE_CANDIDATES = {
-    3009: "Original Mapping (Suspect)",
-    3019: "Voltage L-L A-B",
-    3025: "Voltage L-L Avg (Standard)",
-    3027: "Voltage L-N Avg",
-    3031: "Voltage L-L Avg (Alt)"
-}
-
-# --- CANDIDATE REGISTERS FOR CURRENT COMPARISON ---
-CURRENT_CANDIDATES = {
-    2999: "Current Phase A (Primary Suspect)",
-    3001: "Current Phase B",
-    3003: "Current Phase C",
-    3009: "Current Average (Standard)",
-    3011: "Current Average (Alt)",
-    3017: "Current Unbalance % (Current Config)",
-    3021: "Demand Current"
-}
-
-# --- CANDIDATE REGISTERS FOR POWER COMPARISON ---
-# We will read these side-by-side to identify the correct one for furnace load tracking
-POWER_CANDIDATES = {
-    3027: "Active Power Total (Alt 1)",
-    3045: "Current Mapping (Likely Wrong)",
-    3053: "Active Power Total (Alt 2)",
-    3059: "Active Power Total (Standard)",
-    3067: "Active Power Total (Alt 3)"
-}
-
-
-# --- TELEMETRY VALIDATION ---
-def validate_telemetry(data):
-    """
-    Apply defensive validation rules for furnace environment.
-    Low power/current is OK (normal furnace cycle), but technical errors are not.
-    """
-    errors = []
+def acquire_lock():
+    if fcntl is None:
+        return # Skip on non-linux
     
-    # 1. Power Factor Validation
-    if data['power_factor'] is not None and data['power_factor'] > 1.0:
-        errors.append(f"PF > 1 ({data['power_factor']})")
-        # Do not force to 1.0 if invalid, keep as None to signify missing/invalid
-        data['power_factor'] = None
-        
-    # 2. Voltage Collapse Validation
-    if data['voltage'] is not None and 0 < data['voltage'] < 10:
-        errors.append(f"Unrealistic Voltage ({data['voltage']}V)")
-        data['voltage'] = None
-        
-    # 3. NaN Check (Handled by sanitize_float, but log here for explicit validation record)
-    if data['power_kw'] is None:
-        # We don't add to errors if it's null, as sanitize_float already logged it
-        pass
+    try:
+        f = open(LOCK_FILE, 'w')
+        fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        f.write(str(os.getpid()))
+        f.flush()
+        # Keep file handle open to maintain lock
+        return f
+    except (IOError, OSError):
+        print("[{}] [BOOT] Duplicate poller detected for Slave {}. EXITING.".format(get_log_ts(), PHYSICAL_SLAVE_ID), flush=True)
+        sys.exit(1)
 
-    if errors:
-        print(f"[{datetime.now()}] VALIDATION WARNING: {', '.join(errors)}", flush=True)
+def update_heartbeat(status, duration, kwh):
+    try:
+        if not os.path.exists("storage"): os.makedirs("storage")
+        hb = {
+            "slave_id": PHYSICAL_SLAVE_ID,
+            "last_poll": get_log_ts(),
+            "status": status,
+            "poll_duration_sec": round(duration, 2),
+            "last_kwh": kwh
+        }
+        with open(HEARTBEAT_FILE, 'w') as f:
+            json.dump(hb, f)
+    except Exception as e:
+        print("[{}] HEARTBEAT ERROR: {}".format(get_log_ts(), e), flush=True)
+
+def save_to_buffer(payload):
+    try:
+        if not os.path.exists(BUFFER_DIR): os.makedirs(BUFFER_DIR)
+        filename = "failed_{}.json".format(datetime.now().strftime("%Y%m%d_%H%M%S"))
+        path = os.path.join(BUFFER_DIR, filename)
+        with open(path, 'w') as f:
+            json.dump(payload, f)
+        print("[{}] Telemetry buffered: {}".format(get_log_ts(), filename), flush=True)
+    except Exception as e:
+        print("[{}] BUFFER SAVE ERROR: {}".format(get_log_ts(), e), flush=True)
+
+def process_buffer():
+    if not os.path.exists(BUFFER_DIR): return
+    files = sorted(glob.glob(os.path.join(BUFFER_DIR, "*.json")))
+    if not files: return
     
-    return data
+    print("[{}] Processing offline buffer ({} files)...".format(get_log_ts(), len(files)), flush=True)
+    count = 0
+    headers = {'X-Device-Token': DEVICE_TOKEN, 'Content-Type': 'application/json'}
+    
+    for f_path in files:
+        if count >= 20: break # Max 20 per cycle
+        try:
+            with open(f_path, 'r') as f:
+                payload = json.load(f)
+            
+            response = requests.post(LARAVEL_API_URL, json=payload, headers=headers, timeout=5)
+            if response.status_code == 200:
+                os.remove(f_path)
+                count += 1
+            else:
+                break # Stop on first failure
+        except Exception:
+            break
+            
+    if count > 0:
+        print("[{}] Successfully flushed {} files from buffer.".format(get_log_ts(), count), flush=True)
 
-
-# --- SANITIZE FLOAT ---
-def sanitize_float(val, name="Value"):
-    """Replace NaN/Inf with None (null in JSON) and log if invalid."""
-    if val is None:
-        return None
-    if math.isnan(val) or math.isinf(val):
-        print(f"[{datetime.now()}] INVALID {name.upper()} DETECTED (NaN/Inf) → Setting to null", flush=True)
-        return None
+def sanitize_float(val):
+    if val is None: return None
+    if math.isnan(val) or math.isinf(val): return None
     return val
 
-
-# --- READ FLOAT32 (2 Registers → IEEE 754 Float) ---
-def read_float(client, address, slave, debug=False):
-    """Read a 32-bit IEEE 754 float from 2 consecutive Modbus registers."""
+def read_float(client, address, slave):
     try:
         rr = client.read_holding_registers(address=address, count=2, slave=slave)
-        if rr.isError():
-            print(f"[{LOG_TS()}] MODBUS ERROR at Reg {address}: {rr}", flush=True)
-            return None
+        if rr.isError(): return None
         raw = rr.registers
-        
-        # Big-Endian word order: High word first (ABCD)
+        if DEBUG_RAW_REGISTERS:
+            print("[{}] DEBUG REG {} RAW: {}".format(get_log_ts(), address, raw), flush=True)
         raw_bytes = struct.pack('>HH', raw[0], raw[1])
         value = struct.unpack('>f', raw_bytes)[0]
-
-        if debug:
-            print(f"[{LOG_TS()}] DEBUG REG {address}: Raw={raw} | Bytes={raw_bytes.hex()} | Decoded={value}", flush=True)
-
         return value
-    except Exception as e:
-        print(f"[{LOG_TS()}] EXCEPTION at Reg {address}: {e}", flush=True)
-        return None
+    except Exception: return None
 
-
-# --- READ INT64 (4 Registers → 64-bit signed integer) ---
 def read_int64(client, address, slave):
-    """
-    Read a 64-bit signed integer from 4 consecutive Modbus registers.
-    PM2200 stores Energy as INT64 in Wh. Divide by 1000 to convert to kWh.
-    Word order: Big-Endian (highest word first).
-    """
     try:
         rr = client.read_holding_registers(address=address, count=4, slave=slave)
-        if rr.isError():
-            print(f"[{datetime.now()}] MODBUS ERROR at Reg {address} (INT64): {rr}", flush=True)
-            return None
+        if rr.isError(): return None
         raw = rr.registers
-        # Combine 4 x 16-bit words into a single 64-bit integer (Big-Endian)
-        # raw[0] = highest word, raw[3] = lowest word
+        if DEBUG_RAW_REGISTERS:
+            print("[{}] DEBUG REG {} RAW: {}".format(get_log_ts(), address, raw), flush=True)
         value_bytes = struct.pack('>HHHH', raw[0], raw[1], raw[2], raw[3])
-        value = struct.unpack('>q', value_bytes)[0]  # 'q' = signed 64-bit integer
+        value = struct.unpack('>q', value_bytes)[0]
         return value
-    except Exception as e:
-        print(f"[{datetime.now()}] EXCEPTION at Reg {address} (INT64): {e}", flush=True)
-        return None
+    except Exception: return None
 
-
-# --- POLL DEVICE ---
 def poll_meter():
+    global LAST_KWH_READING, LAST_POLL_TIME, LAST_METER_BOOT_ID, LAST_TELEMETRY, STALE_COUNT, OFFLINE_COUNT
     client = ModbusTcpClient(MODBUS_IP, port=MODBUS_PORT, timeout=5)
-
+    
     if not client.connect():
-        print(f"[{datetime.now()}] STATUS: OFFLINE (Cannot connect to {MODBUS_IP})", flush=True)
+        print("[{}] STATUS: OFFLINE (Cannot connect to {}:{})".format(get_log_ts(), MODBUS_IP, MODBUS_PORT), flush=True)
+        client.close()
+        OFFLINE_COUNT += 1
         return None
 
     try:
-        # Read Total Energy: INT64 in Wh → convert to kWh
+        OFFLINE_COUNT = 0 # Reset on success
         wh_total = read_int64(client, REG_TOTAL_WH, PHYSICAL_SLAVE_ID)
-
-        if wh_total is None:
-            print(f"[{datetime.now()}] STATUS: NO RESPONSE (Connected but failed to read energy register)", flush=True)
+        kw       = read_float(client, REG_TOTAL_KW, PHYSICAL_SLAVE_ID)
+        amps     = read_float(client, REG_AVG_AMP, PHYSICAL_SLAVE_ID)
+        volts    = read_float(client, REG_AVG_VOLT, PHYSICAL_SLAVE_ID)
+        pf       = read_float(client, REG_PF, PHYSICAL_SLAVE_ID)
+        
+        all_failed = (wh_total is None and kw is None and amps is None and volts is None and pf is None)
+        if all_failed:
+            print("[{}] STATUS: OFFLINE (All registers failed)".format(get_log_ts()), flush=True)
             return None
-
-        kwh_total = wh_total / 1000.0  # Convert Wh → kWh
-
-        # Read other parameters (Float32)
-        kw    = read_float(client, REG_TOTAL_KW,  PHYSICAL_SLAVE_ID)
-        amps  = read_float(client, REG_AVG_AMP,   PHYSICAL_SLAVE_ID)
-        volts = read_float(client, REG_AVG_VOLT,  PHYSICAL_SLAVE_ID)
-        pf    = read_float(client, REG_PF,        PHYSICAL_SLAVE_ID)
-
-        # --- VOLTAGE REGISTER COMPARISON MODE ---
-        print(f"[{LOG_TS()}] --- VOLTAGE REGISTER COMPARISON ---", flush=True)
-        for addr, desc in VOLTAGE_CANDIDATES.items():
-            val = read_float(client, addr, PHYSICAL_SLAVE_ID)
-            status = f"{val:.1f} V" if val is not None else "ERROR"
-            print(f"  Reg {addr} ({desc}): {status}", flush=True)
-        print(f"[{LOG_TS()}] ------------------------------------", flush=True)
-
-        # --- CURRENT REGISTER COMPARISON MODE ---
-        print(f"[{LOG_TS()}] --- CURRENT REGISTER COMPARISON (CT Ratio: {CT_RATIO}) ---", flush=True)
-        for addr, desc in CURRENT_CANDIDATES.items():
-            val = read_float(client, addr, PHYSICAL_SLAVE_ID)
-            if val is not None:
-                scaled = val * CT_RATIO
-                print(f"  Reg {addr} ({desc}): {val:.3f} (Secondary) | {scaled:.1f} A (Scaled Primary)", flush=True)
-            else:
-                print(f"  Reg {addr} ({desc}): ERROR", flush=True)
-        print(f"[{LOG_TS()}] -----------------------------------------------------", flush=True)
-
-        # Defensive validation & Sanitization
-        kw_s    = sanitize_float(kw,    "power_kw")
-        amps_s  = sanitize_float(amps,  "current")
-        volts_s = sanitize_float(volts, "voltage")
-        pf_s    = sanitize_float(pf,    "power_factor")
-        kwh_s   = sanitize_float(kwh_total, "energy_kwh")
-
+            
+        if wh_total is None:
+            print("[{}] STATUS: CORRUPTED (Energy register failed)".format(get_log_ts()), flush=True)
+            return None
+            
+        kwh_total = wh_total / 1000.0
         data = {
-            'slave_id':     REPORT_AS_SLAVE_ID,
-            'kwh_total':    round(kwh_s, 3) if kwh_s is not None else None,
-            'power_kw':     round(kw_s, 3) if kw_s is not None else None,
-            'voltage':      round(volts_s, 1) if volts_s is not None else None,
-            'current':      round(amps_s, 2) if amps_s is not None else None,
-            'power_factor': round(pf_s, 3) if pf_s is not None else None,
+            'slave_id':      REPORT_AS_SLAVE_ID,
+            'meter_boot_id': METER_BOOT_ID,
+            'kwh_total':     round(sanitize_float(kwh_total), 3),
+            'power_kw':      round(sanitize_float(kw), 3) if kw is not None else None,
+            'voltage':       round(sanitize_float(volts), 1) if volts is not None else None,
+            'current':       round(sanitize_float(amps), 2) if amps is not None else None,
+            'power_factor':  round(sanitize_float(pf), 3) if pf is not None else None,
+            'meter_replaced': False,
+            'stale_telemetry': False
         }
 
-        # Apply Furnace-Specific Validation
-        data = validate_telemetry(data)
-
-        # --- PRIMARY PHYSICAL VALIDATION: ENERGY GROWTH ---
-        global LAST_KWH_READING, LAST_POLL_TIME
-        now_ts = time.time()
-        growth_str = "First reading"
-        
-        if LAST_KWH_READING is not None and data['kwh_total'] is not None:
-            growth = data['kwh_total'] - LAST_KWH_READING
-            
-            # Calculate time-adjusted threshold
-            # Default to 1.0 if time diff is zero/negative to avoid division errors
-            elapsed_min = max(0.01, (now_ts - LAST_POLL_TIME) / 60.0) if LAST_POLL_TIME else 1.0
-            threshold = GROWTH_THRESHOLD_KWH_PER_MIN * elapsed_min
-            
-            if growth < 0:
-                print(f"[{LOG_TS()}] WARNING: NEGATIVE ENERGY DELTA DETECTED ({growth:.3f} kWh). Meter reset or corruption suspected.", flush=True)
-                growth_str = f"INVALID: Negative ({growth:.3f})"
-                # Do NOT update baseline for growth calculation to recover from transient errors
-            elif growth > threshold:
-                print(f"[{LOG_TS()}] WARNING: UNREALISTIC ENERGY SPIKE DETECTED ({growth:.3f} kWh in {elapsed_min:.1f} min). Max allowed: {threshold:.1f} kWh.", flush=True)
-                growth_str = f"INVALID: Spike ({growth:.3f})"
-                # Do NOT update baseline
-            else:
-                growth_str = f"+{growth:.3f} kWh since last poll"
-                LAST_KWH_READING = data['kwh_total']
-                LAST_POLL_TIME    = now_ts
+        # --- STALE TELEMETRY DETECTION ---
+        current_vals = [data['kwh_total'], data['power_kw'], data['voltage'], data['current'], data['power_factor']]
+        if LAST_TELEMETRY == current_vals:
+            STALE_COUNT += 1
+            if STALE_COUNT > STALE_THRESHOLD:
+                print("[{}] [STALE TELEMETRY WARNING] Frozen data detected.".format(get_log_ts()), flush=True)
+                data['stale_telemetry'] = True
         else:
-            # First reading or null energy
-            if data['kwh_total'] is not None:
+            STALE_COUNT = 0
+        LAST_TELEMETRY = current_vals
+
+        # --- REPLACEMENT DETECTION ---
+        now_ts = time.time()
+        if LAST_METER_BOOT_ID and LAST_METER_BOOT_ID != METER_BOOT_ID:
+            if LAST_KWH_READING and data['kwh_total'] < LAST_KWH_READING:
+                print("[{}] [METER REPLACEMENT DETECTED] {} -> {}".format(get_log_ts(), LAST_METER_BOOT_ID, METER_BOOT_ID), flush=True)
+                data['meter_replaced'] = True
                 LAST_KWH_READING = data['kwh_total']
-                LAST_POLL_TIME    = now_ts
+                LAST_POLL_TIME = now_ts
+                LAST_METER_BOOT_ID = METER_BOOT_ID
+                return data
 
-        print(
-            f"[{LOG_TS()}] READ OK → "
-            f"E={data['kwh_total'] if data['kwh_total'] is not None else 'N/A'} kWh ({growth_str}) | "
-            f"P={data['power_kw'] if data['power_kw'] is not None else 'NaN'} kW | "
-            f"V={data['voltage']} V | "
-            f"I={data['current']} A | "
-            f"PF={data['power_factor']}",
-            flush=True
-        )
-
+        # --- GROWTH VALIDATION ---
+        if LAST_KWH_READING and data['kwh_total']:
+            growth = data['kwh_total'] - LAST_KWH_READING
+            if growth >= 0 and growth < 500: # Simple bound
+                LAST_KWH_READING = data['kwh_total']
+                LAST_POLL_TIME = now_ts
+            else:
+                print("[{}] WARNING: Anomalous growth ({:.3f})".format(get_log_ts(), growth), flush=True)
+        else:
+            LAST_KWH_READING = data['kwh_total']
+            LAST_POLL_TIME = now_ts
+        
+        LAST_METER_BOOT_ID = METER_BOOT_ID
         return data
 
     except Exception as e:
-        print(f"[{datetime.now()}] ERROR polling: {e}", flush=True)
+        print("[{}] POLL ERROR: {}".format(get_log_ts(), e), flush=True)
         return None
-
     finally:
         client.close()
 
-
-# --- MAIN LOOP ---
 def main():
-    print("=== Energy Tracker Modbus TCP Poller ===", flush=True)
-    print(f"Target       : {MODBUS_IP}:{MODBUS_PORT} (Slave ID: {PHYSICAL_SLAVE_ID})", flush=True)
-    print(f"Report as    : Slave ID {REPORT_AS_SLAVE_ID}", flush=True)
-    print(f"API Target   : {LARAVEL_API_URL}", flush=True)
-    print(f"Interval     : {INTERVAL_SECONDS}s ({INTERVAL_SECONDS // 60} minutes)", flush=True)
-    print(f"Energy Reg   : {REG_TOTAL_WH} (INT64, Wh → /1000 = kWh)", flush=True)
-    print("", flush=True)
+    lock_handle = acquire_lock()
+    print("====================================", flush=True)
+    print("INDUSTRIAL HISTORIAN POLLER ACTIVE", flush=True)
+    print("SLAVE: {} | BOOT: {}".format(PHYSICAL_SLAVE_ID, METER_BOOT_ID), flush=True)
+    print("====================================", flush=True)
 
     poll_count = 0
-
     while True:
         start_time = time.time()
         poll_count += 1
-
+        
+        process_buffer()
+        
         data = poll_meter()
-
-        # If offline: send a marker with is_offline=True, kwh_total=None
-        # Laravel will use the last known kwh_total from DB
+        status = "ONLINE" if data else "OFFLINE"
+        last_kwh = data['kwh_total'] if data else LAST_KWH_READING
+        
         payload = data if data else {
-            'slave_id':     REPORT_AS_SLAVE_ID,
-            'kwh_total':    None,
-            'power_kw':     None,
-            'voltage':      None,
-            'current':      None,
+            'slave_id': REPORT_AS_SLAVE_ID,
+            'meter_boot_id': METER_BOOT_ID,
+            'kwh_total': None,
+            'power_kw': None,
+            'voltage': None,
+            'current': None,
             'power_factor': None,
+            'is_offline': True
         }
 
         try:
-            headers = {
-                'X-Device-Token': DEVICE_TOKEN,
-                'Content-Type': 'application/json'
-            }
+            headers = {'X-Device-Token': DEVICE_TOKEN, 'Content-Type': 'application/json'}
             response = requests.post(LARAVEL_API_URL, json=payload, headers=headers, timeout=10)
-
             if response.status_code == 200:
-                if data:
-                    print(
-                        f"[{LOG_TS()}] #{poll_count} API OK → "
-                        f"{payload['kwh_total']} kWh stored",
-                        flush=True
-                    )
-                else:
-                    print(f"[{LOG_TS()}] #{poll_count} OFFLINE reported to API", flush=True)
+                print("[{}] #{}: API OK".format(get_log_ts(), poll_count), flush=True)
             else:
-                print(
-                    f"[{LOG_TS()}] #{poll_count} API ERROR {response.status_code} → {response.text[:200]}",
-                    flush=True
-                )
+                save_to_buffer(payload)
+        except Exception:
+            save_to_buffer(payload)
 
-        except Exception as e:
-            print(f"[{LOG_TS()}] #{poll_count} API FAILED: {e}", flush=True)
+        elapsed = time.time() - start_time
+        update_heartbeat(status, elapsed, last_kwh)
+        print("[{}] [POLL] Duration: {:.2f} sec".format(get_log_ts(), elapsed), flush=True)
+        
+        # --- RECOVERY MODE ---
+        if OFFLINE_COUNT >= RECOVERY_THRESHOLD:
+            print("[{}] [RECOVERY MODE] Cooling down 30s due to multiple failures.".format(get_log_ts()), flush=True)
+            time.sleep(30)
+            OFFLINE_COUNT = 0
 
-        elapsed    = time.time() - start_time
-        sleep_time = max(1, INTERVAL_SECONDS - elapsed)
-        time.sleep(sleep_time)
-
+        gc.collect() # Memory safety
+        time.sleep(max(1, INTERVAL_SECONDS - (time.time() - start_time)))
 
 if __name__ == "__main__":
     main()

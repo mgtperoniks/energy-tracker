@@ -9,6 +9,7 @@ use App\Models\PowerReadingRaw;
 use App\Models\ElectricityTariff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class OperationalEventTagController extends Controller
@@ -39,8 +40,10 @@ class OperationalEventTagController extends Controller
 
     private function validateSequence($deviceId, $eventTime, $eventType, $excludeId = null, $force = false)
     {
+        $eventTimeStr = $eventTime instanceof Carbon ? $eventTime->format('Y-m-d H:i:s') : Carbon::parse($eventTime)->format('Y-m-d H:i:s');
+
         $query = OperationalEventTag::where('device_id', $deviceId)
-            ->where('event_time', '<', $eventTime)
+            ->where('event_time', '<', $eventTimeStr)
             ->orderBy('event_time', 'desc');
             
         if ($excludeId) {
@@ -48,6 +51,16 @@ class OperationalEventTagController extends Controller
         }
         
         $previousTag = $query->first();
+
+        $nextQuery = OperationalEventTag::where('device_id', $deviceId)
+            ->where('event_time', '>', $eventTimeStr)
+            ->orderBy('event_time', 'asc');
+            
+        if ($excludeId) {
+            $nextQuery->where('id', '!=', $excludeId);
+        }
+        
+        $nextTag = $nextQuery->first();
 
         if (!$previousTag) {
             if ($eventType !== 'start') {
@@ -64,6 +77,20 @@ class OperationalEventTagController extends Controller
 
             if ($previousTag->event_type === 'end' && $eventType !== 'start') {
                 if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'No events allowed after an "end" tag unless starting a new operation.'];
+            }
+        }
+
+        if ($nextTag) {
+            if ($nextTag->event_type === $eventType) {
+                return ['status' => 'INVALID', 'message' => 'Cannot repeat the same event type consecutively with the next tag.'];
+            }
+
+            if ($nextTag->event_type === 'pour' && !in_array($eventType, ['melting', 'test'])) {
+                if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'The next event is pour, which typically follows melting or test. This breaks the expected sequence.'];
+            }
+
+            if ($eventType === 'end' && $nextTag->event_type !== 'start') {
+                if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'No events allowed after an "end" tag unless starting a new operation. The next tag is not start.'];
             }
         }
         
@@ -83,17 +110,25 @@ class OperationalEventTagController extends Controller
         ]);
 
         $eventTime = Carbon::parse($validated['event_time'])->setTimezone('Asia/Jakarta');
+        $eventTimeStr = $eventTime->format('Y-m-d H:i:s');
 
         $exists = OperationalEventTag::where('device_id', $deviceId)
-            ->where('event_time', $eventTime)
+            ->where('event_time', $eventTimeStr)
             ->exists();
 
         if ($exists) {
             return response()->json(['status' => 'INVALID', 'message' => 'An event already exists at this exact timestamp.'], 422);
         }
 
-        $validation = $this->validateSequence($deviceId, $eventTime, $validated['event_type'], null, $validated['force'] ?? false);
+        $validation = $this->validateSequence($deviceId, $eventTimeStr, $validated['event_type'], null, $validated['force'] ?? false);
         if ($validation['status'] !== 'VALID') {
+            Log::build(['driver' => 'single', 'path' => storage_path('logs/telemetry-tags.log')])->warning("Invalid Sequence Attempt", [
+                'user' => auth()->id() ?? 1,
+                'ip' => $request->ip(),
+                'device' => $deviceId,
+                'event_type' => $validated['event_type'],
+                'message' => $validation['message']
+            ]);
             return response()->json($validation, 422);
         }
 
@@ -106,6 +141,16 @@ class OperationalEventTagController extends Controller
             'shift' => $validated['shift'] ?? '1',
             'source_reference' => $validated['source_reference'] ?? null,
             'verification_status' => $validated['verification_status'] ?? 'verified',
+        ]);
+
+        Log::build(['driver' => 'single', 'path' => storage_path('logs/telemetry-tags.log')])->info("Tag Created", [
+            'user' => auth()->id() ?? 1,
+            'ip' => $request->ip(),
+            'timestamp' => now()->toIso8601String(),
+            'device' => $deviceId,
+            'event_type' => $validated['event_type'],
+            'event_time' => $eventTimeStr,
+            'forced' => $validated['force'] ?? false
         ]);
 
         $tag->event_time = Carbon::parse($tag->event_time)->setTimezone('Asia/Jakarta')->toIso8601String();
@@ -127,11 +172,12 @@ class OperationalEventTagController extends Controller
         ]);
 
         $eventTime = Carbon::parse($validated['event_time'])->setTimezone('Asia/Jakarta');
+        $eventTimeStr = $eventTime->format('Y-m-d H:i:s');
 
         if ($tag->event_time->ne($eventTime)) {
             $exists = OperationalEventTag::where('device_id', $tag->device_id)
                 ->where('id', '!=', $id)
-                ->where('event_time', $eventTime)
+                ->where('event_time', $eventTimeStr)
                 ->exists();
 
             if ($exists) {
@@ -139,10 +185,19 @@ class OperationalEventTagController extends Controller
             }
         }
 
-        $validation = $this->validateSequence($tag->device_id, $eventTime, $validated['event_type'], $id, $validated['force'] ?? false);
+        $validation = $this->validateSequence($tag->device_id, $eventTimeStr, $validated['event_type'], $id, $validated['force'] ?? false);
         if ($validation['status'] !== 'VALID') {
+            Log::build(['driver' => 'single', 'path' => storage_path('logs/telemetry-tags.log')])->warning("Invalid Sequence Attempt", [
+                'user' => auth()->id() ?? 1,
+                'ip' => $request->ip(),
+                'device' => $tag->device_id,
+                'event_type' => $validated['event_type'],
+                'message' => $validation['message']
+            ]);
             return response()->json($validation, 422);
         }
+
+        $oldEventType = $tag->event_type;
 
         $tag->update([
             'event_type' => $validated['event_type'],
@@ -155,6 +210,16 @@ class OperationalEventTagController extends Controller
             'verification_status' => $validated['verification_status'] ?? 'adjusted',
         ]);
 
+        Log::build(['driver' => 'single', 'path' => storage_path('logs/telemetry-tags.log')])->info("Tag Edited", [
+            'user' => auth()->id() ?? 1,
+            'ip' => $request->ip(),
+            'timestamp' => now()->toIso8601String(),
+            'device' => $tag->device_id,
+            'old_value' => $oldEventType,
+            'new_value' => $validated['event_type'],
+            'forced' => $validated['force'] ?? false
+        ]);
+
         $tag->event_time = Carbon::parse($tag->event_time)->setTimezone('Asia/Jakarta')->toIso8601String();
         return response()->json($tag->load(['tagger', 'editor']));
     }
@@ -162,6 +227,15 @@ class OperationalEventTagController extends Controller
     public function destroy($id)
     {
         $tag = OperationalEventTag::findOrFail($id);
+
+        Log::build(['driver' => 'single', 'path' => storage_path('logs/telemetry-tags.log')])->info("Tag Deleted", [
+            'user' => auth()->id() ?? 1,
+            'ip' => request()->ip(),
+            'timestamp' => now()->toIso8601String(),
+            'device' => $tag->device_id,
+            'event_type' => $tag->event_type
+        ]);
+
         $tag->delete();
         return response()->json(['message' => 'Tag deleted']);
     }
@@ -198,6 +272,16 @@ class OperationalEventTagController extends Controller
             };
         };
 
+        // Preload telemetry ONCE to avoid N+1 queries in the loop
+        $allReadings = PowerReadingRaw::where('device_id', $deviceId)
+            ->where('recorded_at', '>=', $beforeTag ? $beforeTag->event_time : $start)
+            ->where('recorded_at', '<=', $end)
+            ->orderBy('recorded_at', 'asc')
+            ->get();
+
+        $tariff = ElectricityTariff::where('is_active', true)->first();
+        $rate = $tariff ? $tariff->rate_per_kwh : 0;
+
         for ($i = 0; $i < $totalTags; $i++) {
             $currentTag = $tags[$i];
             
@@ -212,19 +296,15 @@ class OperationalEventTagController extends Controller
 
             $durationMinutes = $currentTag->event_time->diffInMinutes($phaseEnd);
 
-            $readings = PowerReadingRaw::where('device_id', $deviceId)
-                ->where('recorded_at', '>=', $currentTag->event_time)
-                ->where('recorded_at', '<', $phaseEnd)
-                ->get();
+            $readings = $allReadings->filter(function ($reading) use ($currentTag, $phaseEnd) {
+                return $reading->recorded_at >= $currentTag->event_time && $reading->recorded_at < $phaseEnd;
+            })->values();
 
             $avgKw = 0; $peakKw = 0; $usageKwh = 0; $estCost = 0;
 
             if ($readings->count() > 0) {
                 $avgKw = $readings->avg('active_power_kw');
                 $peakKw = $readings->max('active_power_kw');
-
-                $tariff = ElectricityTariff::where('is_active', true)->first();
-                $rate = $tariff ? $tariff->rate_per_kwh : 0;
 
                 $firstReading = $readings->first();
                 $lastReading = $readings->last();
@@ -234,10 +314,6 @@ class OperationalEventTagController extends Controller
                 } else {
                     $usageKwh = $avgKw * ($durationMinutes / 60);
                 }
-
-                $estCost = collect($readings)->reduce(function ($carry, $reading) use ($tariff) {
-                    return $carry; 
-                }, 0);
                 
                 $estCost = $usageKwh * $rate;
             }

@@ -1,0 +1,17 @@
+[Unit]
+Description=Modbus TCP Poller for Furnace (Slave 5)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/Energy-Tracker
+EnvironmentFile=/opt/Energy-Tracker/.env.slave5
+ExecStart=/usr/bin/python3 /opt/Energy-Tracker/modbus_poller.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/poller-slave5.log
+StandardError=append:/var/log/poller-slave5.log
+
+[Install]
+WantedBy=multi-user.target
