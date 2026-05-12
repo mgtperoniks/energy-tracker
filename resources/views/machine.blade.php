@@ -333,6 +333,7 @@
                             <th class="px-4 py-2 text-right">PF</th>
                             <th class="px-4 py-2 text-right">Total (kWh)</th>
                             <th class="px-4 py-2 text-center">Status</th>
+                            <th class="px-4 py-2 text-center">Quality</th>
                             <th class="px-4 py-2 text-right">Action</th>
                         </tr>
                     </thead>
@@ -633,6 +634,32 @@
                 });
         }
 
+        // TASK 8: Visualization Smoothing Logic
+        function interpolateSmallGaps(dataArray, maxGapSize = 2) {
+            const result = [...dataArray];
+            let gapStart = -1;
+            for (let i = 0; i < result.length; i++) {
+                if (result[i] === null) {
+                    if (gapStart === -1) gapStart = i;
+                } else {
+                    if (gapStart !== -1) {
+                        let gapSize = i - gapStart;
+                        if (gapSize <= maxGapSize && gapStart > 0) {
+                            // Simple linear interpolation for visualization smoothing
+                            let startVal = result[gapStart - 1];
+                            let endVal = result[i];
+                            for (let j = gapStart; j < i; j++) {
+                                let factor = (j - (gapStart - 1)) / (i - (gapStart - 1));
+                                result[j] = startVal + (endVal - startVal) * factor;
+                            }
+                        }
+                        gapStart = -1;
+                    }
+                }
+            }
+            return result;
+        }
+
         function renderChart(data) {
             try {
                 if (chartInstance) chartInstance.destroy();
@@ -644,18 +671,18 @@
             }
             updateHealthPanel('chart', 'LOADED');
 
-            const powerData = data.map(item =>
-                item.power_kw !== null ? Number(item.power_kw) : null
-            );
+            // Apply smoothing for visualization ONLY (Task 8)
+            const rawPower = data.map(item => item.power_kw !== null ? Number(item.power_kw) : null);
+            const powerData = interpolateSmallGaps(rawPower);
+            
             const validPowerData = powerData.filter(v => v !== null);
             const actualMaxPower = validPowerData.length > 0
                 ? Math.max(...validPowerData)
                 : 0;
             const powerAxisMax = Math.max(actualMaxPower * 1.1, 6.8);
 
-            const voltageData = data.map(item =>
-                item.voltage !== null ? Number(item.voltage) : null
-            );
+            const rawVoltage = data.map(item => item.voltage !== null ? Number(item.voltage) : null);
+            const voltageData = interpolateSmallGaps(rawVoltage);
 
             const labels = data.map(item => item.timestamp);
 
@@ -708,11 +735,10 @@
                 });
             } else if (currentMetric === 'current') {
                 unit = 'A';
+                const rawCurrent = data.map(item => item.current !== null ? Number(item.current) : null);
                 datasets.push({
                     label: 'Current (A)',
-                    data: data.map(item =>
-                        item.current !== null ? Number(item.current) : null
-                    ),
+                    data: interpolateSmallGaps(rawCurrent),
                     yAxisID: 'y_power',
                     borderColor: '#10b981',
                     borderWidth: 1.5,
@@ -722,11 +748,10 @@
                 });
             } else if (currentMetric === 'pf') {
                 unit = '';
+                const rawPF = data.map(item => item.power_factor !== null ? Number(item.power_factor) : null);
                 datasets.push({
                     label: 'PF',
-                    data: data.map(item =>
-                        item.power_factor !== null ? Number(item.power_factor) : null
-                    ),
+                    data: interpolateSmallGaps(rawPF),
                     yAxisID: 'y_power',
                     borderColor: '#8b5cf6',
                     borderWidth: 1.5,
@@ -960,6 +985,15 @@
                         const fmtNum = (v, dec=2) => { const n = parseFloat(v); return isNaN(n) ? (0).toFixed(dec) : n.toFixed(dec); };
                         const timestamp = formatWIB(row.recorded_at);
                         const statusHtml = row.status_badge;
+                        const quality = row.telemetry_quality || 'GOOD';
+                        const qualityColors = {
+                            'GOOD': 'text-green-600',
+                            'PARTIAL': 'text-orange-500',
+                            'OFFLINE': 'text-slate-400',
+                            'STALE': 'text-amber-600 font-black',
+                            'INTERPOLATED': 'text-blue-500'
+                        };
+                        const qColor = qualityColors[quality] || 'text-outline';
 
                         tr.innerHTML = `
                             <td class="px-4 py-2 font-mono text-[10px] text-outline">${timestamp}</td>
@@ -969,6 +1003,7 @@
                             <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.power_factor)}</td>
                             <td class="px-4 py-2 text-right font-bold text-on-surface">${fmtNum(row.kwh_total)}</td>
                             <td class="px-4 py-2 text-center">${statusHtml}</td>
+                            <td class="px-4 py-2 text-center font-black text-[9px] ${qColor}">${quality}</td>
                             <td class="px-4 py-2 text-right">
                                 <button class="text-primary hover:underline text-[9px] font-black uppercase detail-btn"
                                     data-timestamp="${timestamp}"

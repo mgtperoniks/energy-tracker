@@ -20,6 +20,9 @@ class PowerReadingRaw extends Model
         'current' => 'decimal:2',
         'power_factor' => 'decimal:3',
         'recorded_at' => 'datetime',
+        'is_offline' => 'boolean',
+        'gap_detected' => 'boolean',
+        'poll_duration_sec' => 'float',
     ];
 
     public function device()
@@ -32,12 +35,9 @@ class PowerReadingRaw extends Model
      */
     public function getOperationalStatusAttribute()
     {
-        // TODO: Restore OFFLINE check once is_offline column is added to database
-        /*
         if ($this->is_offline) {
             return 'OFFLINE';
         }
-        */
 
         // STANDBY: meter powered, machine completely off (all values null)
         if ($this->voltage === null && $this->current === null && ($this->power_kw === null || (float)$this->power_kw === 0.0)) {

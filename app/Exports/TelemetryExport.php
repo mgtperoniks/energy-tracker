@@ -45,7 +45,11 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
             'Current (A)',
             'Power Factor',
             'Total kWh',
-            'Status'
+            'Industrial Status',
+            'Quality',
+            'Poll Duration (s)',
+            'Meter Boot ID',
+            'Gap Detected'
         ];
     }
 
@@ -57,12 +61,16 @@ class TelemetryExport implements FromCollection, WithHeadings, WithMapping, Shou
         return [
             $reading->recorded_at ? $reading->recorded_at->format('Y-m-d H:i:s') : '-',
             $reading->device->machine->code ?? '-',
-            $reading->power_kw !== null ? round((float)$reading->power_kw, 2) : null,
-            $reading->voltage !== null ? round((float)$reading->voltage, 1) : null,
-            $reading->current !== null ? round((float)$reading->current, 1) : null,
-            $reading->power_factor !== null ? round((float)$reading->power_factor, 2) : null,
-            $reading->kwh_total !== null ? round((float)$reading->kwh_total, 2) : null,
+            $reading->power_kw !== null ? (float)$reading->power_kw : null,
+            $reading->voltage !== null ? (float)$reading->voltage : null,
+            $reading->current !== null ? (float)$reading->current : null,
+            $reading->power_factor !== null ? (float)$reading->power_factor : null,
+            $reading->kwh_total !== null ? (float)$reading->kwh_total : null,
             $reading->operational_status,
+            $reading->telemetry_quality ?? 'GOOD',
+            $reading->poll_duration_sec !== null ? round((float)$reading->poll_duration_sec, 3) : null,
+            $reading->meter_boot_id ?? '-',
+            $reading->gap_detected ? 'YES' : 'NO',
         ];
     }
 

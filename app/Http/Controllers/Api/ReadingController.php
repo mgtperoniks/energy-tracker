@@ -21,16 +21,17 @@ class ReadingController extends Controller
 
             // EMERGENCY: Accept ANY payload with at least slave_id
             $validated = $request->validate([
-                'slave_id'        => 'required|integer',
-                'meter_boot_id'   => 'nullable|string',
-                'kwh_total'       => 'nullable|numeric',
-                'power_kw'        => 'nullable|numeric',
-                'voltage'         => 'nullable|numeric',
-                'current'         => 'nullable|numeric',
-                'power_factor'    => 'nullable|numeric',
-                'is_offline'      => 'nullable|boolean',
-                'meter_replaced'  => 'nullable|boolean',
-                'stale_telemetry' => 'nullable|boolean',
+                'slave_id'          => 'required|integer',
+                'meter_boot_id'     => 'nullable|string',
+                'kwh_total'         => 'nullable|numeric',
+                'power_kw'          => 'nullable|numeric',
+                'voltage'           => 'nullable|numeric',
+                'current'           => 'nullable|numeric',
+                'power_factor'      => 'nullable|numeric',
+                'is_offline'        => 'nullable|boolean',
+                'meter_replaced'    => 'nullable|boolean',
+                'telemetry_quality' => 'nullable|string',
+                'poll_duration_sec' => 'nullable|numeric',
             ]);
 
             $device = Device::where('slave_id', $validated['slave_id'])
@@ -47,13 +48,28 @@ class ReadingController extends Controller
 
             $isOffline      = (bool) ($validated['is_offline'] ?? false);
             $meterReplaced  = (bool) ($validated['meter_replaced'] ?? false);
-            $recordedAt     = $now->copy()->startOfMinute();
+            $recordedAt     = now()->floorSecond();
             $incomingKwhRaw = (float) ($validated['kwh_total'] ?? 0);
             $currentBaseline = (float) ($device->active_baseline_kwh ?? 0);
+            $quality        = $validated['telemetry_quality'] ?? ($isOffline ? 'OFFLINE' : 'GOOD');
+
+            // --- TASK 7: GAP DETECTION ---
+            $latest = PowerReadingRaw::where('device_id', $device->id)
+                ->where('recorded_at', '<', $recordedAt)
+                ->orderByDesc('recorded_at')
+                ->first();
+            
+            $gapDetected = false;
+            if ($latest) {
+                $diffInSeconds = $recordedAt->diffInSeconds($latest->recorded_at);
+                // Flag if gap is > 7.5 minutes (assuming 5m interval)
+                if ($diffInSeconds > 450) {
+                    $gapDetected = true;
+                }
+            }
 
             // If offline with no kwh, use last known value to maintain timeline
             if ($isOffline && ($validated['kwh_total'] ?? null) === null) {
-                $latest = PowerReadingRaw::where('device_id', $device->id)->orderByDesc('recorded_at')->first();
                 $incomingKwhRaw = $latest ? (float) $latest->meter_kwh_raw : 0;
             }
 
@@ -67,17 +83,21 @@ class ReadingController extends Controller
             // Use raw COALESCE upsert so partial/null readings never overwrite good data
             DB::statement("
                 INSERT INTO power_readings_raw
-                    (device_id, recorded_at, meter_kwh_raw, kwh_total, power_kw, voltage, `current`, power_factor, is_offline)
+                    (device_id, recorded_at, meter_kwh_raw, kwh_total, power_kw, voltage, `current`, power_factor, is_offline, telemetry_quality, poll_duration_sec, meter_boot_id, gap_detected)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    meter_kwh_raw = COALESCE(VALUES(meter_kwh_raw), meter_kwh_raw),
-                    kwh_total     = COALESCE(VALUES(kwh_total), kwh_total),
-                    power_kw      = COALESCE(VALUES(power_kw), power_kw),
-                    voltage       = COALESCE(VALUES(voltage), voltage),
-                    `current`     = COALESCE(VALUES(`current`), `current`),
-                    power_factor  = COALESCE(VALUES(power_factor), power_factor),
-                    is_offline    = COALESCE(VALUES(is_offline), is_offline)
+                    meter_kwh_raw     = COALESCE(VALUES(meter_kwh_raw), meter_kwh_raw),
+                    kwh_total         = COALESCE(VALUES(kwh_total), kwh_total),
+                    power_kw          = COALESCE(VALUES(power_kw), power_kw),
+                    voltage           = COALESCE(VALUES(voltage), voltage),
+                    `current`         = COALESCE(VALUES(`current`), `current`),
+                    power_factor      = COALESCE(VALUES(power_factor), power_factor),
+                    is_offline        = COALESCE(VALUES(is_offline), is_offline),
+                    telemetry_quality = VALUES(telemetry_quality),
+                    poll_duration_sec = VALUES(poll_duration_sec),
+                    meter_boot_id     = VALUES(meter_boot_id),
+                    gap_detected      = VALUES(gap_detected)
             ", [
                 $device->id,
                 $recordedAt->toDateTimeString(),
@@ -88,6 +108,10 @@ class ReadingController extends Controller
                 $validated['current'] ?? null,
                 $validated['power_factor'] ?? null,
                 $isOffline ? 1 : 0,
+                $quality,
+                $validated['poll_duration_sec'] ?? null,
+                $validated['meter_boot_id'] ?? null,
+                $gapDetected ? 1 : 0,
             ]);
 
             $device->update([
@@ -97,7 +121,7 @@ class ReadingController extends Controller
                 'active_baseline_kwh' => $currentBaseline,
             ]);
 
-            Log::info('Telemetry Saved', ['device_id' => $device->id, 'kwh' => $normalizedKwhTotal, 'status' => $isOffline ? 'OFFLINE' : 'ONLINE']);
+            Log::info('Telemetry Saved', ['device_id' => $device->id, 'quality' => $quality, 'gap' => $gapDetected]);
             return response()->json(['status' => 'success']);
 
         } catch (\Exception $e) {
@@ -107,4 +131,3 @@ class ReadingController extends Controller
         }
     }
 }
-
