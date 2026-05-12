@@ -450,6 +450,7 @@
         let visualRange = { min: null, max: null };
         let currentTags = [];
         let currentPhases = [];
+        let decimatedData = []; // Store for annotation index mapping
         let activeRequests = {}; // Temporarily unused in recovery
         let forensicBusy = false; // Patch 5: Spam Protection
         
@@ -639,7 +640,7 @@
             // Decimation logic: step = ceil(total / 3000)
             const maxPoints = 3000;
             const step = Math.max(1, Math.ceil(filteredData.length / maxPoints));
-            const decimatedData = (step === 1) ? filteredData : filteredData.filter((_, i) => i % step === 0);
+            decimatedData = (step === 1) ? filteredData : filteredData.filter((_, i) => i % step === 0);
 
             // Category Scale: Labels MUST match data points
             const labels = decimatedData.map(function(item) {
@@ -887,7 +888,7 @@
 
         // Patch 4: Consolidated Industrial Process Annotations (Tags + Phase Bands)
         function redrawAnnotations() {
-            if (!chartInstance || !visualRange.min || !visualRange.max) return;
+            if (!chartInstance || !visualRange.min || !visualRange.max || !decimatedData.length) return;
             const annotations = {};
             let phaseCount = 0;
 
@@ -898,33 +899,45 @@
                 
                 // Performance: Only render if overlaps visible viewport
                 if (endTs < visualRange.min || startTs > visualRange.max) return;
-                if (phaseCount >= 15) return; // Cap for performance safety
-                phaseCount++;
+                
+                // Map timestamps to Indices for Category Scale Precision
+                let idxMin = -1;
+                let idxMax = -1;
+                for(let d=0; d < decimatedData.length; d++) {
+                    const ts = new Date(decimatedData[d].timestamp).getTime();
+                    if (idxMin === -1 && ts >= startTs) idxMin = d;
+                    if (ts <= endTs) idxMax = d;
+                }
 
-                annotations['phase_' + i] = {
-                    type: 'box',
-                    xMin: p.start_time,
-                    xMax: p.end_time,
-                    backgroundColor: getPhaseOverlayColor(p.phase.toLowerCase()),
-                    borderWidth: 0,
-                    drawTime: 'beforeDatasetsDraw',
-                    label: {
-                        display: true,
-                        content: [p.phase_name.toUpperCase(), p.duration_human],
-                        position: 'center',
-                        color: 'rgba(0,0,0,0.5)',
-                        font: { size: 10, weight: 'bold' },
-                        padding: 4
-                    },
-                    enter: function(ctx) {
-                        ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase()).replace('0.12', '0.25').replace('0.15', '0.3').replace('0.10', '0.2');
-                        ctx.chart.update('none');
-                    },
-                    leave: function(ctx) {
-                        ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase());
-                        ctx.chart.update('none');
-                    }
-                };
+                if (idxMin !== -1 && idxMax !== -1 && idxMax >= idxMin) {
+                    if (phaseCount >= 15) return; // Cap for performance safety
+                    phaseCount++;
+
+                    annotations['phase_' + i] = {
+                        type: 'box',
+                        xMin: idxMin,
+                        xMax: idxMax,
+                        backgroundColor: getPhaseOverlayColor(p.phase.toLowerCase()),
+                        borderWidth: 0,
+                        drawTime: 'beforeDatasetsDraw',
+                        label: {
+                            display: true,
+                            content: [p.phase_name.toUpperCase(), p.duration_human],
+                            position: 'center',
+                            color: 'rgba(0,0,0,0.5)',
+                            font: { size: 10, weight: 'bold' },
+                            padding: 4
+                        },
+                        enter: function(ctx) {
+                            ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase()).replace('0.12', '0.25').replace('0.15', '0.3').replace('0.10', '0.2');
+                            ctx.chart.update('none');
+                        },
+                        leave: function(ctx) {
+                            ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase());
+                            ctx.chart.update('none');
+                        }
+                    };
+                }
             });
 
             // 2. Tag Event Lines (Existing)
@@ -933,19 +946,32 @@
                 const time = new Date(t.event_time).getTime();
                 if (time < visualRange.min || time > visualRange.max) return;
 
-                annotations['tag_' + t.id] = {
-                    type: 'line', xMin: t.event_time, xMax: t.event_time,
-                    borderColor: getEventColor(t.event_type), borderWidth: 2, borderDash: [4, 4],
-                    label: { 
-                        content: t.event_type.toUpperCase(), 
-                        display: true, 
-                        position: 'start', 
-                        backgroundColor: getEventColor(t.event_type), 
-                        color: '#fff', 
-                        font: { size: 9, weight: 'bold' }, 
-                        padding: 4 
-                    }
-                };
+                // Map timestamp to nearest Index
+                let idxTag = -1;
+                for(let d=0; d < decimatedData.length; d++) {
+                    const ts = new Date(decimatedData[d].timestamp).getTime();
+                    if (ts >= time) { idxTag = d; break; }
+                }
+
+                if (idxTag !== -1) {
+                    annotations['tag_' + t.id] = {
+                        type: 'line', 
+                        xMin: idxTag, 
+                        xMax: idxTag,
+                        borderColor: getEventColor(t.event_type), 
+                        borderWidth: 2, 
+                        borderDash: [4, 4],
+                        label: { 
+                            content: t.event_type.toUpperCase(), 
+                            display: true, 
+                            position: 'start', 
+                            backgroundColor: getEventColor(t.event_type), 
+                            color: '#fff', 
+                            font: { size: 9, weight: 'bold' }, 
+                            padding: 4 
+                        }
+                    };
+                }
             });
 
             chartInstance.options.plugins.annotation.annotations = annotations;
