@@ -662,16 +662,38 @@
                         ctx.fillStyle = getPhaseOverlayColor(p.phase.toLowerCase());
                         ctx.fillRect(xDrawStart, chartArea.top, drawWidth, chartArea.bottom - chartArea.top);
 
-                        // Draw Centered Labels (if region is wide enough)
-                        if (width > 80) {
-                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                            ctx.font = 'bold 10px Inter, sans-serif';
-                            ctx.textAlign = 'center';
+                        // Draw Adaptive Labels (Density Patch)
+                        if (width > 28) {
+                            const shortNames = {
+                                melting: 'MELT',
+                                pour: 'POUR',
+                                idle: 'IDLE',
+                                start: 'HEAT',
+                                test: 'TEST',
+                                end: 'END'
+                            };
+
                             const centerX = xStart + (width / 2);
-                            if (centerX > chartArea.left && centerX < chartArea.right) {
-                                ctx.fillText(p.phase_name.toUpperCase(), centerX, chartArea.top + 20);
-                                ctx.fillText(p.duration_human, centerX, chartArea.top + 32);
+                            const safeCenterX = Math.max(chartArea.left + 10, Math.min(centerX, chartArea.right - 10));
+                            
+                            ctx.save();
+                            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                            ctx.textAlign = 'center';
+
+                            if (width > 120) {
+                                ctx.font = 'bold 10px Inter, sans-serif';
+                                ctx.fillText(p.phase_name.toUpperCase(), safeCenterX, chartArea.top + 20);
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 34);
+                            } else if (width > 60) {
+                                ctx.font = 'bold 9px Inter, sans-serif';
+                                const shortLabel = shortNames[p.phase.toLowerCase()] || p.phase_name.toUpperCase();
+                                ctx.fillText(shortLabel, safeCenterX, chartArea.top + 18);
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 30);
+                            } else {
+                                ctx.font = 'bold 8px Inter, sans-serif';
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 22);
                             }
+                            ctx.restore();
                         }
                         ctx.restore();
                     }
