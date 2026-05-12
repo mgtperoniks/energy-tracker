@@ -139,7 +139,7 @@
                 </div>
             </div>
             
-            <div id="chart-container" class="relative h-[450px] w-full bg-white dark:bg-slate-900 rounded-lg shadow-inner overflow-hidden">
+            <div id="chart-container" class="chart-wrapper relative h-[420px] w-full bg-white dark:bg-slate-900 rounded-lg shadow-inner overflow-hidden">
                 <!-- Forensic Navigation Arrows -->
                 <div id="forensic-nav" class="hidden">
                     <button onclick="shiftForensic(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/5 hover:bg-black/10 rounded-full transition-all group">
@@ -154,15 +154,26 @@
                         </span>
                     </div>
                 </div>
-                <canvas id="powerChart"></canvas>
+                <canvas id="powerChart" style="pointer-events: auto;"></canvas>
             </div>
             <div class="mt-4 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center p-1 bg-surface-container-low rounded-lg border border-surface-container">
-                    <button onclick="updateRange(1)" id="btn-1h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">1H</button>
-                    <button onclick="updateRange(4)" id="btn-4h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">4H</button>
-                    <button onclick="updateRange(12)" id="btn-12h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">12H</button>
-                    <button onclick="updateRange(24)" id="btn-24h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">24H</button>
-                    <button onclick="updateRange(168)" id="btn-7d" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">7D</button>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center p-1 bg-surface-container-low rounded-lg border border-surface-container">
+                        <button onclick="updateRange(1)" id="btn-1h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">1H</button>
+                        <button onclick="updateRange(4)" id="btn-4h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">4H</button>
+                        <button onclick="updateRange(12)" id="btn-12h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">12H</button>
+                        <button onclick="updateRange(24)" id="btn-24h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">24H</button>
+                        <button onclick="updateRange(168)" id="btn-7d" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">7D</button>
+                    </div>
+                    
+                    <!-- Forensic Date/Time Filter -->
+                    <div class="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-surface-container ml-2">
+                        <input type="date" id="forensic-date" class="bg-transparent text-[10px] font-bold text-on-surface outline-none px-2 py-1 cursor-pointer">
+                        <input type="time" id="forensic-time" class="bg-transparent text-[10px] font-bold text-on-surface outline-none px-2 py-1 cursor-pointer border-l border-surface-container">
+                        <button onclick="applyForensicDateTime()" class="ml-1 p-1 bg-primary text-white rounded hover:brightness-110 transition-all">
+                            <span class="material-symbols-outlined text-sm">search</span>
+                        </button>
+                    </div>
                 </div>
                 <div id="forensic-helper" class="text-[10px] font-medium text-outline hidden">
                     <span class="flex items-center gap-1.5">
@@ -289,22 +300,25 @@
             </div>
         </div>
 
-        <!-- Historian Health Panel -->
+        <!-- Historian Health Panel (Patch 3: Industrial Watchdog) -->
         <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
             <div class="px-3 py-1.5 border-b border-surface-container-low bg-surface-container-low/30 flex justify-between items-center">
                 <h2 class="text-[9px] font-black text-on-surface uppercase tracking-widest flex items-center gap-2">
                     <span class="material-symbols-outlined text-[10px]">monitor_heart</span>
                     Historian Health Diagnostics
                 </h2>
-                <span id="health-last-refresh" class="text-[8px] font-mono text-outline">Waiting...</span>
+                <div class="flex items-center gap-3">
+                    <span id="health-stall-indicator" class="hidden px-2 py-0.5 bg-amber-100 text-amber-700 font-black text-[8px] rounded uppercase animate-pulse">Historian Stale</span>
+                    <span id="health-last-refresh" class="text-[8px] font-mono text-outline">Waiting...</span>
+                </div>
             </div>
             <div class="p-2 flex flex-wrap gap-4 text-[9px] uppercase tracking-widest text-outline">
-                <div>Chart: <span id="health-chart" class="font-black text-on-surface">INIT</span></div>
+                <div>Telemetry: <span id="health-telemetry-freshness" class="font-black text-on-surface">-</span></div>
+                <div>Points: <span id="health-telemetry" class="font-black text-on-surface">0</span></div>
                 <div>Tags: <span id="health-tags" class="font-black text-on-surface">0</span></div>
                 <div>Phases: <span id="health-phases" class="font-black text-on-surface">0</span></div>
-                <div>Telemetry: <span id="health-telemetry" class="font-black text-on-surface">0</span></div>
                 <div>Forensic: <span id="health-forensic" class="font-black text-on-surface">OFF</span></div>
-                <div>Mode: <span id="health-network" class="font-black text-primary">OFFLINE LAN</span></div>
+                <div>Status: <span id="health-status" class="font-black text-primary">STABLE</span></div>
             </div>
         </div>
 
@@ -323,10 +337,11 @@
                 </div>
             </div>
             
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="bg-surface-container-low text-[9px] font-black text-on-surface-variant uppercase tracking-widest">
+            <!-- Patch 6: Telemetry Table Hardening -->
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto relative">
+                <table class="w-full text-left border-collapse">
+                    <thead class="sticky top-0 z-10 bg-surface-container-low">
+                        <tr class="text-[9px] font-black text-on-surface-variant uppercase tracking-widest border-b border-surface-container">
                             <th class="px-4 py-2">Timestamp</th>
                             <th class="px-4 py-2 text-right">Power (kW)</th>
                             <th class="px-4 py-2 text-right">Volt (V)</th>
@@ -384,9 +399,23 @@
         let cachedData = [];
         let visualRange = { min: null, max: null };
         let currentTags = [];
+        let activeRequestId = 0; // Patch 2: Collision Protection
+        let forensicBusy = false; // Patch 5: Spam Protection
         
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         const isReadonly = !['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'].includes('{{ auth()->user()->email }}');
+
+        // Patch 2: Collision Guarded Fetch
+        function guardedFetch(url, options) {
+            const requestId = ++activeRequestId;
+            return safeFetch(url, options).then(function(res) {
+                if (requestId !== activeRequestId) {
+                    console.warn('Ignoring stale response', url);
+                    return new Promise(function(){}); // Never resolve stale requests
+                }
+                return res;
+            });
+        }
 
         // Patch 6: Hardened safeFetch with non-JSON fallback
         function safeFetch(url, options) {
@@ -453,8 +482,39 @@
             initDashboard();
         };
 
+        window.applyForensicDateTime = function() {
+            const date = document.getElementById('forensic-date').value;
+            const time = document.getElementById('forensic-time').value;
+            if (!date || !time) return alert('Please select both Date and Time.');
+            
+            const target = new Date(date + 'T' + time);
+            const fetchStart = new Date(target.getTime() - (9 * 60 * 60 * 1000));
+            const fetchEnd = new Date(target.getTime() + (9 * 60 * 60 * 1000));
+            
+            // Trigger load with specific range
+            currentHours = 4;
+            updateRange(4); // Ensure mode UI is correct
+
+            safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`)
+                .then(function(response) {
+                    cachedData = response.data || [];
+                    const vTarget = target.getTime();
+                    visualRange = { min: vTarget - (2 * 60 * 60 * 1000), max: vTarget + (2 * 60 * 60 * 1000) };
+                    renderChart(cachedData);
+                    loadTags();
+                    loadPhases();
+                })
+                .catch(function(err) {
+                    console.error('DateTime Jump Failed:', err);
+                    updateHealthPanel('status', 'JUMP ERROR', 'text-error');
+                });
+        };
+
         window.shiftForensic = function(direction) {
-            if (currentHours !== 4 || !cachedData.length) return;
+            if (currentHours !== 4 || !cachedData.length || forensicBusy) return;
+            
+            forensicBusy = true; // Patch 5: Lock interaction
+            setTimeout(function() { forensicBusy = false; }, 500); // 500ms Debounce
             
             const shiftMs = direction * (60 * 60 * 1000); // 1 hour shift
             const newMin = visualRange.min + shiftMs;
@@ -479,30 +539,44 @@
         };
 
         function loadChartData() {
-            const fetchHours = (currentHours === 4) ? 18 : currentHours;
-            const end = new Date();
-            const start = new Date(end.getTime() - (fetchHours * 60 * 60 * 1000));
+            try {
+                const fetchHours = (currentHours === 4) ? 18 : currentHours;
+                const end = new Date();
+                const start = new Date(end.getTime() - (fetchHours * 60 * 60 * 1000));
 
-            return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
-                .then(function(response) {
-                    cachedData = response.data || [];
-                    updateHealthPanel('telemetry', cachedData.length);
-                    updateHealthPanel('forensic', currentHours === 4 ? 'ACTIVE' : 'OFF');
-                    
-                    if (currentHours === 4) {
-                        const vEnd = end.getTime();
-                        visualRange = { min: vEnd - (4 * 60 * 60 * 1000), max: vEnd };
-                    } else {
-                        visualRange = { min: start.getTime(), max: end.getTime() };
-                    }
-                    renderChart(cachedData);
-                });
+                return guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+                    .then(function(response) {
+                        cachedData = response.data || [];
+                        updateHealthPanel('telemetry', cachedData.length);
+                        updateHealthPanel('forensic', currentHours === 4 ? 'ACTIVE' : 'OFF');
+                        
+                        if (currentHours === 4) {
+                            const vEnd = end.getTime();
+                            visualRange = { min: vEnd - (4 * 60 * 60 * 1000), max: vEnd };
+                        } else {
+                            visualRange = { min: start.getTime(), max: end.getTime() };
+                        }
+                        renderChart(cachedData);
+                    })
+                    .catch(function(e) {
+                        console.error('Chart Data Error:', e);
+                        updateHealthPanel('status', 'CHART ERR', 'text-error');
+                    });
+            } catch (err) {
+                console.error('loadChartData Crash:', err);
+            }
         }
 
         // Patch 2 & 9: Stable Render (No free-drag pan)
         // Patch 9: Chart decimation (Max 3000 points)
         function renderChart(data) {
-            if (chartInstance) chartInstance.destroy();
+            try {
+                // Patch 9: Proper Memory Cleanup
+                if (chartInstance) {
+                    chartInstance.options.plugins.annotation.annotations = {};
+                    chartInstance.destroy();
+                    chartInstance = null;
+                }
             
             // Decimation logic: step = ceil(total / 3000)
             const maxPoints = 3000;
@@ -511,30 +585,55 @@
 
             const labels = decimatedData.map(item => item.timestamp);
             const powerData = decimatedData.map(item => item.power_kw);
+            const voltageData = decimatedData.map(item => item.voltage);
+            
+            // Patch 9: Handler cleanup before destruction
+            ctx.canvas.onclick = null;
             
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Active Power (kW)',
-                        data: powerData,
-                        borderColor: '#00628c',
-                        backgroundColor: 'rgba(0, 98, 140, 0.05)',
-                        fill: true,
-                        pointRadius: 0,
-                        borderWidth: 1.5,
-                        tension: 0.1,
-                        spanGaps: true
-                    }]
+                    datasets: [
+                        {
+                            label: 'Active Power (kW)',
+                            data: powerData,
+                            borderColor: '#00628c',
+                            backgroundColor: 'rgba(0, 98, 140, 0.05)',
+                            fill: true,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            tension: 0.1,
+                            spanGaps: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Voltage (V)',
+                            data: voltageData,
+                            borderColor: '#f97316', // Orange
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            pointRadius: 0,
+                            borderWidth: 1.5,
+                            tension: 0.1,
+                            spanGaps: true,
+                            yAxisID: 'y1'
+                        }
+                    ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true, 
+                    maintainAspectRatio: false,
                     animation: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
                         legend: { display: false },
+                        tooltip: { enabled: true },
                         annotation: { annotations: {} },
-                        decimation: { enabled: false } // We do manual decimation for fidelity
+                        decimation: { enabled: false }
                     },
                     scales: {
                         x: { 
@@ -543,7 +642,19 @@
                             max: visualRange.max,
                             grid: { display: false }
                         },
-                        y: { min: 0, grid: { color: 'rgba(0,0,0,0.05)' } }
+                        y: { 
+                            title: { display: true, text: 'Power (kW)', font: { size: 10, weight: 'bold' } },
+                            min: 0, 
+                            grid: { color: 'rgba(0,0,0,0.05)' } 
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Voltage (V)', font: { size: 10, weight: 'bold' } },
+                            grid: { drawOnChartArea: false },
+                            min: 0
+                        }
                     }
                 }
             });
@@ -634,28 +745,37 @@
                 });
         };
 
-        function updateHealthPanel(key, value) {
+        function updateHealthPanel(key, value, textColor = 'text-on-surface') {
             const el = document.getElementById('health-' + key);
-            if (el) el.textContent = value;
+            if (el) {
+                el.textContent = value;
+                el.className = 'font-black ' + textColor;
+            }
             document.getElementById('health-last-refresh').textContent = new Date().toLocaleTimeString();
         }
 
         function loadTags() {
-            safeFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
-                .then(function(tags) {
-                    currentTags = tags;
-                    updateHealthPanel('tags', tags.length);
-                    renderTimeline(tags);
-                    drawTagAnnotations(tags);
-                });
+            try {
+                guardedFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
+                    .then(function(tags) {
+                        currentTags = tags;
+                        updateHealthPanel('tags', tags.length);
+                        renderTimeline(tags);
+                        drawTagAnnotations(tags);
+                    })
+                    .catch(function(e) { updateHealthPanel('status', 'TAG ERR', 'text-error'); });
+            } catch(err) { console.error('loadTags Crash:', err); }
         }
 
         function loadPhases() {
-            safeFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
-                .then(function(phases) {
-                    updateHealthPanel('phases', phases.length);
-                    renderPhases(phases);
-                });
+            try {
+                guardedFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
+                    .then(function(phases) {
+                        updateHealthPanel('phases', phases.length);
+                        renderPhases(phases);
+                    })
+                    .catch(function(e) { updateHealthPanel('status', 'PHASE ERR', 'text-error'); });
+            } catch(err) { console.error('loadPhases Crash:', err); }
         }
 
         // Patch 4: Filter Tag Annotations by Visible Window
@@ -692,14 +812,26 @@
             const container = document.getElementById('timeline-content');
             if (!container) return;
             container.innerHTML = '';
+            
+            if (tags.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-outline italic text-[10px]">No historical tags found.</div>';
+                return;
+            }
+
             tags.forEach(function(t) {
                 const div = document.createElement('div');
-                div.className = 'p-2 rounded border border-surface-container bg-white mb-2 cursor-pointer';
+                div.className = 'p-3 rounded-lg border border-surface-container bg-white shadow-sm mb-3 cursor-pointer hover:border-primary transition-all group';
                 div.onclick = function() { openTagModal(t.event_time, t); };
+                
+                const color = getEventColor(t.event_type);
+                
                 div.innerHTML = `
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-[10px]">${formatWIB(t.event_time).split(' ')[1]}</span>
-                        <span class="px-1 py-0.5 rounded text-white text-[8px] uppercase font-black" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="font-black text-[11px] text-on-surface tracking-tighter">${formatWIB(t.event_time).split(' ')[1]}</span>
+                        <span class="px-2 py-0.5 rounded text-white text-[9px] uppercase font-black shadow-sm group-hover:scale-105 transition-transform" style="background: ${color}">${t.event_type}</span>
+                    </div>
+                    <div class="text-[9px] text-outline line-clamp-1 font-medium italic group-hover:text-on-surface">
+                        ${t.notes || 'No forensic notes recorded...'}
                     </div>
                 `;
                 container.appendChild(div);
@@ -725,11 +857,18 @@
                     ? '<span class="px-2 py-0.5 bg-primary/10 text-primary rounded font-black text-[8px] animate-pulse uppercase">Active</span>'
                     : '<span class="px-2 py-0.5 bg-outline/10 text-outline rounded font-black text-[8px] uppercase">Closed</span>';
 
+                const phaseColor = getEventColor(p.phase_name.toLowerCase());
+
                 tr.innerHTML = `
                     <td class="px-4 py-2 font-mono text-[10px] text-outline">${formatWIB(p.start_time).split(' ')[1]}</td>
                     <td class="px-4 py-2 font-mono text-[10px] text-outline">${formatWIB(p.end_time).split(' ')[1]}</td>
                     <td class="px-4 py-2 text-center">${statusBadge}</td>
-                    <td class="px-4 py-2 text-primary font-black uppercase text-[10px]">${p.phase_name}</td>
+                    <td class="px-4 py-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full" style="background: ${phaseColor}"></span>
+                            <span class="font-black uppercase text-[10px]" style="color: ${phaseColor}">${p.phase_name}</span>
+                        </div>
+                    </td>
                     <td class="px-4 py-2 text-right font-bold text-on-surface">${p.duration_human}</td>
                     <td class="px-4 py-2 text-right font-medium text-outline">${p.avg_kw}</td>
                     <td class="px-4 py-2 text-right font-medium text-outline">${p.peak_kw}</td>
@@ -757,13 +896,137 @@
             }).format(date).replace(/\//g, '-');
         }
 
+        function loadTelemetry(page = 1) {
+            try {
+                const url = `{{ url('api/machines') }}/${deviceId}/readings?limit=15&page=${page}`;
+                return guardedFetch(url)
+                    .then(function(response) {
+                    const data = response.data;
+                    const tbody = document.getElementById('telemetry-tbody');
+                    if (!tbody) return;
+                    
+                    tbody.innerHTML = '';
+                    if (!data.data || data.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-outline italic text-[10px]">No telemetry stream recorded for this machine.</td></tr>';
+                        return;
+                    }
+
+                    data.data.forEach(function(r) {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-surface-container hover:bg-surface-container-low transition-colors';
+                        
+                        // Patch 1: Null Safe Rendering
+                        const pwr = r.power_kw !== null ? Number(r.power_kw).toFixed(2) : '-';
+                        const vlt = r.voltage !== null ? Number(r.voltage).toFixed(1) : '-';
+                        const cur = r.current !== null ? Number(r.current).toFixed(1) : '-';
+                        const pf  = r.power_factor !== null ? Number(r.power_factor).toFixed(2) : '-';
+                        const kwh = r.kwh_total !== null ? Number(r.kwh_total).toFixed(2) : '-';
+
+                        const statusColor = (r.power_kw || 0) > 2 ? 'text-primary' : 'text-outline';
+                        const qualityBadge = r.telemetry_quality === 'GOOD' 
+                            ? '<span class="text-primary">GOOD</span>' 
+                            : '<span class="text-error font-bold">' + (r.telemetry_quality || 'NULL') + '</span>';
+
+                        tr.innerHTML = `
+                            <td class="px-4 py-2 font-mono text-outline">${formatWIB(r.recorded_at)}</td>
+                            <td class="px-4 py-2 text-right font-black ${statusColor}">${pwr}</td>
+                            <td class="px-4 py-2 text-right text-outline">${vlt}</td>
+                            <td class="px-4 py-2 text-right text-outline">${cur}</td>
+                            <td class="px-4 py-2 text-right text-outline">${pf}</td>
+                            <td class="px-4 py-2 text-right font-bold text-on-surface">${kwh}</td>
+                            <td class="px-4 py-2 text-center">
+                                <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase ${(r.power_kw || 0) > 2 ? 'bg-primary/10 text-primary' : 'bg-outline/10 text-outline'}">
+                                    ${(r.power_kw || 0) > 2 ? 'Running' : 'Idle'}
+                                </span>
+                            </td>
+                            <td class="px-4 py-2 text-center text-[9px] font-black">${qualityBadge}</td>
+                            <td class="px-4 py-2 text-right">
+                                <button onclick="openTagModal('${r.recorded_at}')" class="text-primary hover:underline font-black uppercase text-[9px]">Tag</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    // Patch 4: Stall Detection
+                    if (data.data.length > 0) {
+                        const latest = new Date(data.data[0].recorded_at);
+                        const diffSec = (new Date() - latest) / 1000;
+                        updateHealthPanel('telemetry-freshness', Math.floor(diffSec) + 's');
+                        
+                        const stallIndicator = document.getElementById('health-stall-indicator');
+                        if (diffSec > 180) { // 3 intervals (assuming 60s)
+                            stallIndicator.classList.remove('hidden');
+                            updateHealthPanel('status', 'STALE', 'text-amber-600');
+                        } else {
+                            stallIndicator.classList.add('hidden');
+                            updateHealthPanel('status', 'STABLE', 'text-primary');
+                        }
+                    }
+
+                    // Update Pagination UI
+                    document.getElementById('current-page-display').textContent = data.current_page;
+                    document.getElementById('last-page-display').textContent = data.last_page;
+                    document.getElementById('total-readings-display').textContent = data.total;
+                    
+                    const prevBtn = document.getElementById('prev-page');
+                    const nextBtn = document.getElementById('next-page');
+                    if (prevBtn) {
+                        prevBtn.disabled = data.current_page === 1;
+                        prevBtn.onclick = () => loadTelemetry(data.current_page - 1);
+                    }
+                    if (nextBtn) {
+                        nextBtn.disabled = data.current_page === data.last_page;
+                        nextBtn.onclick = () => loadTelemetry(data.current_page + 1);
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Telemetry Load Error:', err);
+                });
+        }
+
         function initDashboard() {
-            loadChartData().then(function() {
-                loadTags();
-                loadPhases();
-            });
+            try {
+                loadChartData().then(function() {
+                    loadTags();
+                    loadPhases();
+                    loadTelemetry();
+                });
+            } catch (e) {
+                console.error('Dashboard Init Failed:', e);
+                updateHealthPanel('status', 'INIT FAIL', 'text-error');
+            }
+        }
+
+        // Patch 7: Export Safety Hardening
+        const exportBtn = document.querySelector('a[href*="export"]');
+        if (exportBtn) {
+            exportBtn.onclick = function(e) {
+                if (cachedData.length === 0) {
+                    e.preventDefault();
+                    return alert('No data available for export.');
+                }
+                if (cachedData.length > 1440) {
+                    if (!confirm('Warning: Data density is high (>1440 rows). Export may take time. Continue?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+                
+                const originalText = exportBtn.innerHTML;
+                exportBtn.style.pointerEvents = 'none';
+                exportBtn.style.opacity = '0.5';
+                exportBtn.innerHTML = 'Generating...';
+                
+                setTimeout(function() {
+                    exportBtn.style.pointerEvents = 'auto';
+                    exportBtn.style.opacity = '1';
+                    exportBtn.innerHTML = originalText;
+                }, 5000); // Re-enable after 5s or on next interaction
+            };
         }
 
         initDashboard();
+        // Set auto-refresh for telemetry watchdog
+        setInterval(loadTelemetry, 60000);
     });
 </script>
