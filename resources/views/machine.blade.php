@@ -399,18 +399,19 @@
         let cachedData = [];
         let visualRange = { min: null, max: null };
         let currentTags = [];
-        let activeRequestId = 0; // Patch 2: Collision Protection
+        let activeRequests = {}; // Patch 2: Scoped Collision Protection
         let forensicBusy = false; // Patch 5: Spam Protection
         
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         const isReadonly = !['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'].includes('{{ auth()->user()->email }}');
 
-        // Patch 2: Collision Guarded Fetch
-        function guardedFetch(url, options) {
-            const requestId = ++activeRequestId;
+        // Patch 2: Collision Guarded Fetch (Scoped by category)
+        function guardedFetch(url, category, options) {
+            const requestId = (activeRequests[category] || 0) + 1;
+            activeRequests[category] = requestId;
             return safeFetch(url, options).then(function(res) {
-                if (requestId !== activeRequestId) {
-                    console.warn('Ignoring stale response', url);
+                if (requestId !== activeRequests[category]) {
+                    console.warn('Ignoring stale ' + category + ' response', url);
                     return new Promise(function(){}); // Never resolve stale requests
                 }
                 return res;
@@ -495,7 +496,7 @@
             currentHours = 4;
             updateRange(4); // Ensure mode UI is correct
 
-            safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`)
+            guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`, 'chart')
                 .then(function(response) {
                     cachedData = response.data || [];
                     const vTarget = target.getTime();
@@ -544,7 +545,7 @@
                 const end = new Date();
                 const start = new Date(end.getTime() - (fetchHours * 60 * 60 * 1000));
 
-                return guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
+                return guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`, 'chart')
                     .then(function(response) {
                         cachedData = response.data || [];
                         updateHealthPanel('telemetry', cachedData.length);
@@ -756,7 +757,7 @@
 
         function loadTags() {
             try {
-                guardedFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
+                guardedFetch(`{{ url('api/machines') }}/${deviceId}/tags`, 'tags')
                     .then(function(tags) {
                         currentTags = tags;
                         updateHealthPanel('tags', tags.length);
@@ -769,7 +770,7 @@
 
         function loadPhases() {
             try {
-                guardedFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
+                guardedFetch(`{{ url('api/machines') }}/${deviceId}/phases`, 'phases')
                     .then(function(phases) {
                         updateHealthPanel('phases', phases.length);
                         renderPhases(phases);
@@ -899,7 +900,7 @@
         function loadTelemetry(page = 1) {
             try {
                 const url = `{{ url('api/machines') }}/${deviceId}/readings?limit=15&page=${page}`;
-                return guardedFetch(url)
+                return guardedFetch(url, 'telemetry')
                     .then(function(response) {
                     const data = response.data;
                     const tbody = document.getElementById('telemetry-tbody');
