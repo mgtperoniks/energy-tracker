@@ -152,22 +152,20 @@ class MachineDashboardController extends Controller
         $machine = Machine::with('devices')->findOrFail($id);
         $deviceIds = $machine->devices->pluck('id')->toArray();
 
-        if (empty($deviceIds)) {
-            return back()->with('error', 'No meters found for this machine.');
+        // Patch 8: Excel Export Hardening
+        // 1. Enforce Single Device Export only
+        if (count($deviceIds) > 1) {
+            return back()->with('error', 'Forensic Export Limit: Multiple meters detected. Please export per individual meter to maintain historian integrity.');
         }
 
         $rawStart = $request->query('start_date');
         $rawEnd = $request->query('end_date');
-        $isDefaultRange = false;
 
         if (!$rawStart || !$rawEnd) {
             $endDate = now();
             $startDate = now()->subHours(12);
-            $isDefaultRange = true;
         } else {
             try {
-                // EXPLICIT PARSE - Do not use whereDate
-                // Localize to app timezone to prevent UTC offset truncation
                 $startDate = Carbon::parse($rawStart)->setTimezone(config('app.timezone'));
                 $endDate   = Carbon::parse($rawEnd)->setTimezone(config('app.timezone'));
             } catch (\Exception $e) {
@@ -175,30 +173,25 @@ class MachineDashboardController extends Controller
             }
         }
 
-        // Limit to 7 days as requested by user to prevent crashes
-        if ($startDate->diffInDays($endDate) > 7) {
-            return back()->with('error', 'Batas maksimal download adalah 7 hari per export. Silakan perkecil periode pencarian.');
+        // 2. Deny exports larger than 24h
+        if ($startDate->diffInHours($endDate) > 24) {
+            return back()->with('error', 'Forensic Export Limit: Maximum export range is 24 hours (1440 rows) to prevent system instability.');
         }
 
-        // Log row count for debugging
+        // 3. Row count validation
         $count = PowerReadingRaw::whereIn('device_id', $deviceIds)
             ->whereBetween('recorded_at', [$startDate, $endDate])
             ->count();
             
-        \Log::info('EXPORT ROW COUNT', [
-            'machine' => $machine->code,
-            'count'   => $count,
-            'start'   => $startDate->toDateTimeString(),
-            'end'     => $endDate->toDateTimeString(),
-            'default' => $isDefaultRange
-        ]);
-
-        if ($count === 0) {
-            return back()->with('warning', "Tidak ada data telemetry ditemukan untuk periode {$startDate->format('d M H:i')} s/d {$endDate->format('d M H:i')}.");
+        if ($count > 1500) {
+            return back()->with('error', 'Forensic Export Limit: Detected row density too high for XLSX. Please use a smaller time window.');
         }
 
-        $rangeLabel = $isDefaultRange ? "12h" : $startDate->format('Ymd') . "_" . $endDate->format('Ymd');
-        $filename = "meter_{$machine->code}_telemetry_{$rangeLabel}_" . now()->format('Ymd_Hi') . ".xlsx";
+        if ($count === 0) {
+            return back()->with('warning', "No telemetry found for period {$startDate->format('d M H:i')} - {$endDate->format('d M H:i')}.");
+        }
+
+        $filename = "meter_{$machine->code}_forensic_" . $startDate->format('Ymd_His') . ".xlsx";
 
         try {
             return \Maatwebsite\Excel\Facades\Excel::download(
@@ -207,7 +200,7 @@ class MachineDashboardController extends Controller
             );
         } catch (\Exception $e) {
             \Log::error('Export Error: ' . $e->getMessage());
-            return back()->with('error', 'Gagal membuat file Excel: ' . $e->getMessage());
+            return back()->with('error', 'Export Engine Failure: ' . $e->getMessage());
         }
     }
 }

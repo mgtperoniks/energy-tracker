@@ -37,6 +37,10 @@
                     <span class="inline-block w-1.5 h-1.5 rounded-full {{ $statusColor }} @if($opStatus == 'Running') animate-pulse @endif"></span>
                     <span class="text-[9px] uppercase tracking-widest text-outline font-bold">{{ $opStatus }}</span>
                 </div>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <meta name="csrf-token" content="{{ csrf_token() }}">
+                <title>{{ $machine->name }} - Industrial Historian</title>
                 <h1 class="text-xl font-black tracking-tight text-on-surface">{{ $machine->name }}</h1>
                 <p class="text-on-surface-variant text-[10px] mt-0.5">Code: {{ $machine->code }} | Modbus TCP/RS485</p>
             </div>
@@ -132,56 +136,39 @@
                         <option value="current">Current</option>
                         <option value="pf">PF</option>
                     </select>
-                    <div class="flex bg-surface-container-low p-0.5 rounded" id="chart-range-selector">
-                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="1">1H</button>
-                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="4">4H</button>
-                        <button class="px-2 py-0.5 text-[9px] font-bold rounded bg-white text-primary shadow-sm transition-colors" data-range="12">12H</button>
-                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="24">24H</button>
-                        <button class="px-2 py-0.5 text-[9px] font-bold rounded text-on-surface-variant transition-colors" data-range="168">7D</button>
-                    </div>
-
-                    <button id="btn-create-tag" class="px-3 py-1 bg-primary text-white text-[9px] font-black rounded hover:brightness-110 transition-all flex items-center gap-1.5 uppercase tracking-widest hidden">
-                        <span class="material-symbols-outlined text-sm">add_location_alt</span>
-                        Tag Selected Point
+                </div>
+            </div>
+            
+            <div id="chart-container" class="relative h-[450px] w-full bg-white dark:bg-slate-900 rounded-lg shadow-inner overflow-hidden">
+                <!-- Forensic Navigation Arrows -->
+                <div id="forensic-nav" class="hidden">
+                    <button onclick="shiftForensic(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/5 hover:bg-black/10 rounded-full transition-all group">
+                        <svg class="w-6 h-6 text-slate-400 group-hover:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
                     </button>
-
-                    <!-- Custom Range / Forensic UI -->
-                    <div class="flex items-center gap-1.5 border-l border-surface-container pl-2 ml-1" id="forensic-filter">
-                        <div class="flex flex-col">
-                            <span class="text-[8px] font-black uppercase text-outline">Start</span>
-                            <input type="text" id="forensic-start" class="bg-surface-container-low text-[10px] px-2 py-1 rounded font-bold text-on-surface-variant outline-none border-none w-28" placeholder="YYYY-MM-DD HH:mm">
-                        </div>
-                        <div class="flex flex-col">
-                            <span class="text-[8px] font-black uppercase text-outline">End</span>
-                            <input type="text" id="forensic-end" class="bg-surface-container-low text-[10px] px-2 py-1 rounded font-bold text-on-surface-variant outline-none border-none w-28" placeholder="YYYY-MM-DD HH:mm">
-                        </div>
-                        <button id="btn-forensic-generate" class="bg-primary text-white text-[10px] font-black px-3 py-1.5 rounded self-end hover:brightness-110 transition-all uppercase tracking-tighter">
-                            Gen
-                        </button>
+                    <button onclick="shiftForensic(1)" class="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/5 hover:bg-black/10 rounded-full transition-all group">
+                        <svg class="w-6 h-6 text-slate-400 group-hover:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                    <div class="absolute top-2 left-1/2 -translate-x-1/2 z-20">
+                        <span class="px-3 py-1 bg-primary/10 text-primary font-black text-[10px] uppercase tracking-widest rounded-full border border-primary/20 shadow-sm">
+                            Forensic Mode Active
+                        </span>
                     </div>
                 </div>
+                <canvas id="powerChart"></canvas>
             </div>
-            <div class="flex justify-between items-center mb-2">
-                <div class="flex gap-2 text-[8px] font-black uppercase tracking-widest" id="chart-legend">
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(16, 185, 129, 0.8)">Start</span>
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(249, 115, 22, 0.8)">Melting</span>
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(148, 163, 184, 0.8)">Idle</span>
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(234, 179, 8, 0.8)">Test</span>
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(59, 130, 246, 0.8)">Pour</span>
-                    <span class="px-1.5 py-0.5 rounded text-white shadow-sm" style="background: rgba(239, 68, 68, 0.8)">End</span>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center p-1 bg-surface-container-low rounded-lg border border-surface-container">
+                    <button onclick="updateRange(1)" id="btn-1h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">1H</button>
+                    <button onclick="updateRange(4)" id="btn-4h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">4H</button>
+                    <button onclick="updateRange(12)" id="btn-12h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">12H</button>
+                    <button onclick="updateRange(24)" id="btn-24h" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">24H</button>
+                    <button onclick="updateRange(168)" id="btn-7d" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">7D</button>
                 </div>
-            </div>
-            <div class="flex gap-4">
-                <div class="h-[330px] flex-grow min-w-0">
-                    <canvas id="powerChart"></canvas>
-                </div>
-                <div class="w-64 border border-surface-container-low rounded bg-surface-container-lowest flex flex-col" id="timeline-panel">
-                    <div class="px-3 py-2 border-b border-surface-container-low bg-surface-container-low/50 sticky top-0">
-                        <h4 class="text-[9px] font-black uppercase tracking-widest text-on-surface">Timeline</h4>
-                    </div>
-                    <div class="flex-grow overflow-y-auto p-2 space-y-2 text-[10px]" id="timeline-content">
-                        <!-- timeline items -->
-                    </div>
+                <div id="forensic-helper" class="text-[10px] font-medium text-outline hidden">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                        Forensic tagging enabled. Use arrows to navigate historical window.
+                    </span>
                 </div>
             </div>
 
@@ -216,6 +203,19 @@
             </div>
         </div>
 
+        <!-- Patch 1: Proper Timeline Container ID -->
+        <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
+            <div class="px-4 py-2 border-b border-surface-container-low bg-surface-container-low/30 flex justify-between items-center">
+                <h2 class="text-[10px] font-black text-on-surface uppercase tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">history_edu</span>
+                    Operational Timeline
+                </h2>
+            </div>
+            <div id="timeline-content" class="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+                <div class="text-center py-4 text-outline italic text-[10px]">Loading timeline...</div>
+            </div>
+        </div>
+
         <!-- CREATE/EDIT OPERATIONAL TAG MODAL -->
         <div id="tag-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-md transition-all animate-in fade-in duration-300">
             <div class="bg-white w-full max-w-sm rounded shadow-2xl border border-surface-container overflow-hidden">
@@ -231,7 +231,6 @@
                     <div>
                         <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Selected Timestamp</label>
                         <input type="text" id="tag-timestamp" class="w-full bg-surface-container-low text-xs px-2 py-1.5 rounded font-mono font-bold text-on-surface outline-none border border-surface-container" readonly>
-                        <p class="text-[8px] text-outline mt-0.5">Snapped to nearest telemetry reading.</p>
                     </div>
 
                     <div>
@@ -257,7 +256,7 @@
                     
                     <div>
                         <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Notes (Optional)</label>
-                        <textarea id="tag-notes" class="w-full bg-white text-xs px-2 py-1.5 rounded font-medium text-on-surface outline-none border border-surface-container focus:border-primary h-16 resize-none" placeholder="Add operator notes..."></textarea>
+                        <textarea id="tag-notes" class="w-full bg-white text-xs px-2 py-1.5 rounded font-medium text-on-surface outline-none border border-surface-container focus:border-primary h-16 resize-none"></textarea>
                     </div>
                 </div>
                 <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container flex gap-2 justify-end">
@@ -364,116 +363,8 @@
                 </div>
             </div>
         </div>
-
-        <!-- Meter Reset History - Collapsible Below -->
-        <details class="bg-surface-container-lowest rounded border border-surface-container shadow-sm group">
-            <summary class="px-4 py-3 cursor-pointer list-none flex justify-between items-center hover:bg-surface-container-low/30 transition-colors">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">history</span>
-                    <h2 class="text-[10px] font-black tracking-widest text-on-surface uppercase">Meter Reset History</h2>
-                </div>
-                <span class="material-symbols-outlined text-sm transform transition-transform group-open:rotate-180">expand_more</span>
-            </summary>
-            <div class="border-t border-surface-container-low">
-                <div class="px-4 py-3 flex justify-between items-center">
-                    <p class="text-[10px] text-outline">Log baseline adjustments for physical meter resets.</p>
-                    <button id="btn-log-reset"
-                        data-machine-id="{{ $machine->id }}"
-                        data-machine-name="{{ $machine->name }}"
-                        data-current-kwh="{{ number_format($currentMeterKwh, 2) }}"
-                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black rounded uppercase tracking-widest transition-colors flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-sm">restart_alt</span>
-                        Log New Reset
-                    </button>
-                </div>
-                @if($machine->meterResets->isEmpty())
-                    <div class="px-4 py-4 text-center text-outline italic text-[10px]">No reset history found.</div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-[10px]">
-                            <thead>
-                                <tr class="bg-surface-container-low font-black text-on-surface-variant uppercase tracking-tighter">
-                                    <th class="px-4 py-2">Date</th>
-                                    <th class="px-4 py-2 text-right">kWh at Reset</th>
-                                    <th class="px-4 py-2">Notes</th>
-                                    <th class="px-4 py-2">By</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-surface-container-low">
-                                @foreach($machine->meterResets as $reset)
-                                <tr>
-                                    <td class="px-4 py-2 font-mono">{{ $reset->reset_at->format('d M y H:i') }}</td>
-                                    <td class="px-4 py-2 text-right font-bold text-secondary">{{ number_format($reset->kwh_at_reset, 2) }}</td>
-                                    <td class="px-4 py-2 text-on-surface-variant truncate max-w-[150px]">{{ $reset->notes ?? '-' }}</td>
-                                    <td class="px-4 py-2">{{ $reset->performedBy?->name ?? 'System' }}</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-                <div class="px-4 py-2 bg-surface-container-low/50">
-                    <p class="text-[9px] text-outline font-bold">
-                        Calculated Baseline: {{ number_format($machine->kwh_baseline, 2) }} kWh | Current Raw: {{ number_format($currentMeterKwh, 2) }} kWh
-                    </p>
-                </div>
-            </div>
-        </details>
     </div>
 </main>
-
-<!-- Details Modal -->
-<div id="details-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all animate-in fade-in duration-300 pointer-events-none">
-    <div class="bg-white w-full max-w-sm rounded shadow-2xl border border-surface-container overflow-hidden transform transition-all scale-95 opacity-0 duration-300 pointer-events-auto" id="modal-content">
-        <div class="px-4 py-3 bg-surface-container-low/50 border-b border-surface-container flex justify-between items-center">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-outline">Telemetry Details</h3>
-            <button onclick="closeModal()" class="text-outline hover:text-on-surface transition-colors">
-                <span class="material-symbols-outlined text-sm">close</span>
-            </button>
-        </div>
-        <div class="p-4 space-y-4">
-            <div class="flex justify-between items-end border-b border-surface-container-low pb-3">
-                <div>
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest">Timestamp</span>
-                    <div id="modal-timestamp" class="text-xs font-mono font-black text-on-surface"></div>
-                </div>
-                <div id="modal-status" class="text-right"></div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Active Power</span>
-                    <div class="flex items-baseline gap-1">
-                        <span id="modal-power" class="text-xl font-black text-primary tracking-tighter"></span>
-                        <span class="text-[9px] font-bold text-outline">kW</span>
-                    </div>
-                </div>
-                <div>
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Total Energy</span>
-                    <div class="flex items-baseline gap-1">
-                        <span id="modal-kwh" class="text-xl font-black text-on-surface tracking-tighter"></span>
-                        <span class="text-[9px] font-bold text-outline">kWh</span>
-                    </div>
-                </div>
-                <div>
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Voltage</span>
-                    <div class="text-lg font-bold tracking-tighter text-on-surface"><span id="modal-voltage"></span> <span class="text-[9px] font-bold text-outline">V</span></div>
-                </div>
-                <div>
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Current</span>
-                    <div class="text-lg font-bold tracking-tighter text-on-surface"><span id="modal-current"></span> <span class="text-[9px] font-bold text-outline">A</span></div>
-                </div>
-                <div class="col-span-2">
-                    <span class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Power Factor</span>
-                    <div id="modal-pf" class="text-lg font-black text-on-surface"></div>
-                </div>
-            </div>
-        </div>
-        <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container">
-            <button onclick="closeModal()" class="w-full py-2 bg-primary text-white font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">OK</button>
-        </div>
-    </div>
-</div>
 
 <script src="{{ asset('assets/js/chart.js') }}"></script>
 <script src="{{ asset('assets/js/chartjs-plugin-annotation.min.js') }}"></script>
@@ -482,1085 +373,397 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
+        const phaseSection = document.getElementById('phase-reconstruction-section');
+        const phaseTableBody = document.getElementById('phase-tbody');
+        const tagModal = document.getElementById('tag-modal');
+        
         let chartInstance = null;
         let baseAnnotations = {};
-        let currentHours = 12; // CACHE RANGE
-        let visualHours = 4;   // VISUAL WINDOW (Objective 1)
+        let currentHours = 4; // Default: 4H Forensic Mode
         let currentMetric = 'power';
         let cachedData = [];
         let visualRange = { min: null, max: null };
-
-        // Patch 1: Global listeners to prevent memory leaks
-        let panMouseDownHandler = null;
-        let panMouseMoveHandler = null;
-        let panMouseUpHandler = null;
-
-        // Patch 5: Centralized Readonly Governance
-        const allowedEmails = ['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'];
-        const currentUserEmail = '{{ auth()->user()->email }}';
-        const isReadonly = !allowedEmails.includes(currentUserEmail);
+        let currentTags = [];
         
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
-        if (!deviceId) {
-            renderEmptyChart();
-            return;
-        }
+        const isReadonly = !['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'].includes('{{ auth()->user()->email }}');
 
-        async function safeFetch(url, options = {}, retries = 1) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-                options.signal = controller.signal;
+        // Patch 6: Hardened safeFetch with non-JSON fallback
+        function safeFetch(url, options) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const defaultHeaders = {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            
+            const finalOptions = options || {};
+            finalOptions.headers = Object.assign({}, defaultHeaders, finalOptions.headers || {});
 
-                const response = await fetch(url, options);
-                clearTimeout(timeoutId);
-
+            return fetch(url, finalOptions).then(function(response) {
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    if (response.status === 419) {
+                        alert('Industrial Session Expired. Refreshing dashboard...');
+                        location.reload();
+                        return;
+                    }
+                    return response.text().then(function(text) {
+                        let msg = 'Backend Error';
+                        try {
+                            const json = JSON.parse(text);
+                            msg = json.message || json.error || msg;
+                        } catch(e) {
+                            msg = text.substring(0, 100);
+                        }
+                        throw new Error(msg);
+                    });
                 }
-
-                return await response.json();
-            } catch (error) {
-                if (retries > 0) {
-                    console.warn(`[SafeFetch] Retrying ${url}...`);
-                    return safeFetch(url, options, retries - 1);
+                return response.json();
+            }).catch(function(err) {
+                console.error('Fetch Failed:', err);
+                // Graceful alert instead of crash
+                if (err.message !== 'Industrial Session Expired. Refreshing dashboard...') {
+                    // alert('Communication Failure: ' + err.message);
                 }
-                console.error(`[SafeFetch] Failed: ${error.message}`);
-                throw error;
-            }
+                throw err;
+            });
         }
 
-        // UI bindings
-        const metricSelect = document.getElementById('chart-metric-toggle');
-        const rangeButtons = document.querySelectorAll('#chart-range-selector button');
-        const forensicBtn = document.getElementById('btn-forensic-generate');
-        const forensicStart = document.getElementById('forensic-start');
-        const forensicEnd = document.getElementById('forensic-end');
-
-        // Initialize Flatpickr for 24h format
-        const fpConfig = {
-            enableTime: true,
-            time_24hr: true,
-            dateFormat: "Y-m-d H:i",
-            disableMobile: "true",
-            allowInput: true
-        };
-        const startPicker = flatpickr(forensicStart, fpConfig);
-        const endPicker = flatpickr(forensicEnd, fpConfig);
-
-        function updateHealthPanel(key, val) {
-            const el = document.getElementById('health-' + key);
-            if (el) el.innerText = val;
-            const ref = document.getElementById('health-last-refresh');
-            if (ref) ref.innerText = 'Last Sync: ' + formatWIB(new Date().toISOString()).split(' ')[1];
-        }
-
-        metricSelect.addEventListener('change', function(e) {
-            currentMetric = e.target.value;
-            fetchAndRender();
-        });
-
-        rangeButtons.forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                rangeButtons.forEach(b => {
-                    b.classList.remove('bg-white', 'text-primary', 'shadow-sm');
-                    b.classList.add('text-on-surface-variant');
-                });
-                this.classList.add('bg-white', 'text-primary', 'shadow-sm');
-                this.classList.remove('text-on-surface-variant');
-                
-                currentHours = parseInt(this.dataset.range);
-                
-                // Reset forensic inputs when using quick range
-                startPicker.clear();
-                endPicker.clear();
-                
-                // Reset forensic filter state (Ghost Filter Fix)
-                currentFilters.start = null;
-                currentFilters.end = null;
-                updateHealthPanel('forensic', 'OFF');
-
-                // Reload historian global
-                fetchReadings(1);
-
-                fetchAndRender();
+        // Patch 3 & 4: Range & Forensic Navigation Logic
+        window.updateRange = function(h) {
+            currentHours = h;
+            
+            ['1h', '4h', '12h', '24h', '7d'].forEach(function(id) {
+                const btn = document.getElementById('btn-' + id);
+                if (btn) btn.classList.remove('bg-white', 'shadow-sm', 'text-primary');
             });
-        });
+            const activeBtn = document.getElementById('btn-' + (h === 168 ? '7d' : h + 'h'));
+            if (activeBtn) activeBtn.classList.add('bg-white', 'shadow-sm', 'text-primary');
 
-        forensicBtn.addEventListener('click', function() {
-            if (!forensicStart.value || !forensicEnd.value) {
-                alert('Please select both start and end datetime.');
-                return;
-            }
-
-            const start = new Date(forensicStart.value);
-            const end = new Date(forensicEnd.value);
-
-            if (end <= start) {
-                alert('End datetime must be after start datetime.');
-                return;
-            }
-
-            const diffDays = (end - start) / (1000 * 60 * 60 * 24);
-            if (diffDays > 180) {
-                alert('Maximum range is 180 days.');
-                return;
-            }
-
-            // Remove active state from quick range buttons
-            rangeButtons.forEach(b => {
-                b.classList.remove('bg-white', 'text-primary', 'shadow-sm');
-                b.classList.add('text-on-surface-variant');
-            });
-
-            // Set currentHours for label formatting logic
-            currentHours = diffDays * 24;
-            
-            // Forensic Mode: Apply filter to both Chart AND Ledger
-            currentFilters.start = start.toISOString();
-            currentFilters.end = end.toISOString();
-            updateHealthPanel('forensic', 'ACTIVE');
-            
-            fetchAndRender(start, end);
-            fetchReadings(1); // Manually refresh ledger ONLY on Forensic Search
-        });
-
-        let currentFilters = { start: null, end: null };
-
-        function fetchAndRender(customStart = null, customEnd = null) {
-            let start, end;
-            
-            if (customStart && customEnd) {
-                start = customStart;
-                end = customEnd;
+            const nav = document.getElementById('forensic-nav');
+            const helper = document.getElementById('forensic-helper');
+            if (h === 4) {
+                if (nav) nav.classList.remove('hidden');
+                if (helper) helper.classList.remove('hidden');
             } else {
-                end = new Date();
-                start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+                if (nav) nav.classList.add('hidden');
+                if (helper) helper.classList.add('hidden');
             }
+
+            initDashboard();
+        };
+
+        window.shiftForensic = function(direction) {
+            if (currentHours !== 4 || !cachedData.length) return;
+            
+            const shiftMs = direction * (60 * 60 * 1000); // 1 hour shift
+            const newMin = visualRange.min + shiftMs;
+            const newMax = visualRange.max + shiftMs;
+            
+            const cacheMin = new Date(cachedData[0].timestamp).getTime();
+            const cacheMax = new Date(cachedData[cachedData.length - 1].timestamp).getTime();
+            
+            if (newMin < cacheMin || newMax > cacheMax) {
+                console.warn('Forensic Boundary Reached (18H Cache)');
+                return;
+            }
+            
+            visualRange.min = newMin;
+            visualRange.max = newMax;
+            
+            if (chartInstance) {
+                chartInstance.options.scales.x.min = newMin;
+                chartInstance.options.scales.x.max = newMax;
+                chartInstance.update('none');
+            }
+        };
+
+        function loadChartData() {
+            const fetchHours = (currentHours === 4) ? 18 : currentHours;
+            const end = new Date();
+            const start = new Date(end.getTime() - (fetchHours * 60 * 60 * 1000));
 
             return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
-                .then(response => {
+                .then(function(response) {
                     cachedData = response.data || [];
+                    updateHealthPanel('telemetry', cachedData.length);
+                    updateHealthPanel('forensic', currentHours === 4 ? 'ACTIVE' : 'OFF');
                     
-                    // Set default visual window to latest 4 hours (Objective 1)
-                    const visualEnd = end.getTime();
-                    const visualStart = visualEnd - (visualHours * 60 * 60 * 1000);
-                    visualRange = { min: visualStart, max: visualEnd };
-                    
+                    if (currentHours === 4) {
+                        const vEnd = end.getTime();
+                        visualRange = { min: vEnd - (4 * 60 * 60 * 1000), max: vEnd };
+                    } else {
+                        visualRange = { min: start.getTime(), max: end.getTime() };
+                    }
                     renderChart(cachedData);
-                })
-                .catch(err => {
-                    console.error('Error fetching chart data:', err);
-                    renderEmptyChart();
                 });
         }
 
-        // TASK 8: Visualization Smoothing Logic
-        function interpolateSmallGaps(dataArray, maxGapSize = 2) {
-            const result = [...dataArray];
-            let gapStart = -1;
-            for (let i = 0; i < result.length; i++) {
-                if (result[i] === null) {
-                    if (gapStart === -1) gapStart = i;
-                } else {
-                    if (gapStart !== -1) {
-                        let gapSize = i - gapStart;
-                        if (gapSize <= maxGapSize && gapStart > 0) {
-                            // Simple linear interpolation for visualization smoothing
-                            let startVal = result[gapStart - 1];
-                            let endVal = result[i];
-                            for (let j = gapStart; j < i; j++) {
-                                let factor = (j - (gapStart - 1)) / (i - (gapStart - 1));
-                                result[j] = startVal + (endVal - startVal) * factor;
-                            }
-                        }
-                        gapStart = -1;
-                    }
-                }
-            }
-            return result;
-        }
-
+        // Patch 2 & 9: Stable Render (No free-drag pan)
+        // Patch 9: Chart decimation (Max 3000 points)
         function renderChart(data) {
-            try {
-                if (chartInstance) chartInstance.destroy();
+            if (chartInstance) chartInstance.destroy();
             
-            if (data.length === 0) {
-                renderEmptyChart();
-                updateHealthPanel('chart', 'EMPTY');
-                return;
-            }
-            updateHealthPanel('chart', 'LOADED');
+            // Decimation logic: step = ceil(total / 3000)
+            const maxPoints = 3000;
+            const step = Math.max(1, Math.ceil(data.length / maxPoints));
+            const decimatedData = (step === 1) ? data : data.filter((_, i) => i % step === 0);
 
-            // Apply smoothing for visualization ONLY (Task 8)
-            const rawPower = data.map(item => item.power_kw !== null ? Number(item.power_kw) : null);
-            const powerData = interpolateSmallGaps(rawPower);
+            const labels = decimatedData.map(item => item.timestamp);
+            const powerData = decimatedData.map(item => item.power_kw);
             
-            const validPowerData = powerData.filter(v => v !== null);
-            const actualMaxPower = validPowerData.length > 0
-                ? Math.max(...validPowerData)
-                : 0;
-            const powerAxisMax = Math.max(actualMaxPower * 1.1, 6.8);
-
-            const rawVoltage = data.map(item => item.voltage !== null ? Number(item.voltage) : null);
-            const voltageData = interpolateSmallGaps(rawVoltage);
-
-            const labels = data.map(item => item.timestamp);
-
-            let datasets = [];
-            let unit = '';
-            
-            if (currentMetric === 'power') {
-                unit = 'kW';
-                datasets.push({
-                    label: 'Active Power (kW)',
-                    data: powerData,
-                    yAxisID: 'y_power',
-                    fill: true,
-                    backgroundColor: 'rgba(0, 98, 140, 0.08)',
-                    borderColor: '#00628c',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.25,
-                    spanGaps: false
-                });
-                
-                // Add Voltage as secondary dataset
-                datasets.push({
-                    label: 'Voltage (V)',
-                    data: voltageData,
-                    yAxisID: 'y_voltage',
-                    fill: false,
-                    borderColor: 'rgba(255,140,0,0.75)',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [3, 3],
-                    pointRadius: 0,
-                    pointHoverRadius: 5,
-                    tension: 0.25,
-                    spanGaps: false
-                });
-            } else if (currentMetric === 'voltage') {
-                unit = 'V';
-                datasets.push({
-                    label: 'Voltage (V)',
-                    data: voltageData,
-                    yAxisID: 'y_power', // Re-use left axis for single view
-                    borderColor: 'rgba(255,140,0,0.75)',
-                    borderWidth: 2,
-                    borderDash: [3, 3],
-                    pointRadius: 0,
-                    pointHoverRadius: 5,
-                    tension: 0.25,
-                    spanGaps: false
-                });
-            } else if (currentMetric === 'current') {
-                unit = 'A';
-                const rawCurrent = data.map(item => item.current !== null ? Number(item.current) : null);
-                datasets.push({
-                    label: 'Current (A)',
-                    data: interpolateSmallGaps(rawCurrent),
-                    yAxisID: 'y_power',
-                    borderColor: '#10b981',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.25,
-                    spanGaps: false
-                });
-            } else if (currentMetric === 'pf') {
-                unit = '';
-                const rawPF = data.map(item => item.power_factor !== null ? Number(item.power_factor) : null);
-                datasets.push({
-                    label: 'PF',
-                    data: interpolateSmallGaps(rawPF),
-                    yAxisID: 'y_power',
-                    borderColor: '#8b5cf6',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.25,
-                    spanGaps: false
-                });
-            }
-
-            // Calculate annotations for downtime
-            let chartAnnotations = {};
-            let downtimeStart = -1;
-            let regionCount = 0;
-            let lastActiveIndex = -1;
-
-            powerData.forEach((val, idx) => {
-                if (val === null) {
-                    if (downtimeStart === -1) downtimeStart = idx;
-                } else {
-                    lastActiveIndex = idx;
-                    if (downtimeStart !== -1) {
-                        chartAnnotations['downtime_' + regionCount++] = {
-                            type: 'box',
-                            xMin: labels[downtimeStart],
-                            xMax: labels[idx],
-                            backgroundColor: 'rgba(150, 150, 150, 0.12)',
-                            borderWidth: 0
-                        };
-                        downtimeStart = -1;
-                    }
-                }
-            });
-
-            if (downtimeStart !== -1) {
-                chartAnnotations['downtime_' + regionCount++] = {
-                    type: 'box',
-                    xMin: labels[downtimeStart],
-                    xMax: labels[powerData.length - 1],
-                    backgroundColor: 'rgba(150, 150, 150, 0.12)',
-                    borderWidth: 0
-                };
-            }
-
-            if (lastActiveIndex !== -1 && lastActiveIndex < powerData.length - 1) {
-                chartAnnotations['lastActiveLine'] = {
-                    type: 'line',
-                    xMin: labels[lastActiveIndex],
-                    xMax: labels[lastActiveIndex],
-                    borderColor: 'rgba(239, 68, 68, 0.6)',
-                    borderWidth: 1.5,
-                    label: {
-                        content: 'Machine OFF',
-                        display: true,
-                        position: 'start',
-                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                        color: '#fff',
-                        font: { size: 9, weight: 'bold' },
-                        padding: 4
-                    }
-                };
-            }
-
-            baseAnnotations = window.structuredClone 
-                ? structuredClone(chartAnnotations) 
-                : JSON.parse(JSON.stringify(chartAnnotations));
-
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: datasets
+                    datasets: [{
+                        label: 'Active Power (kW)',
+                        data: powerData,
+                        borderColor: '#00628c',
+                        backgroundColor: 'rgba(0, 98, 140, 0.05)',
+                        fill: true,
+                        pointRadius: 0,
+                        borderWidth: 1.5,
+                        tension: 0.1,
+                        spanGaps: true
+                    }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    animation: false, // Objective 1: Stable rendering
+                    animation: false,
                     plugins: {
-                        legend: { 
-                            display: (currentMetric === 'power'),
-                            position: 'top',
-                            align: 'end',
-                            labels: { boxWidth: 10, font: { size: 9, weight: 'bold' } }
-                        },
-                        tooltip: {
-                            mode: 'index', intersect: false, backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                            titleFont: { size: 10 }, bodyFont: { size: 11 },
-                            callbacks: { 
-                                title: function(context) {
-                                    return formatWIB(context[0].label).substring(5, 16);
-                                },
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) label += ': ';
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y.toFixed(2);
-                                    } else {
-                                        label += 'No Data';
-                                    }
-                                    return label;
-                                }
-                            }
-                        },
-                        annotation: {
-                            // Patch 2: Safe deep clone fallback
-                            annotations: window.structuredClone
-                                ? structuredClone(baseAnnotations || {})
-                                : JSON.parse(JSON.stringify(baseAnnotations || {}))
-                        }
+                        legend: { display: false },
+                        annotation: { annotations: {} },
+                        decimation: { enabled: false } // We do manual decimation for fidelity
                     },
                     scales: {
-                        y_power: { 
-                            type: 'linear',
-                            position: 'left',
-                            grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false }, 
-                            ticks: { font: { size: 9 } },
-                            title: { display: true, text: (currentMetric === 'power' ? 'kW' : unit), font: { size: 9, weight: 'bold' } },
-                            min: 0,
-                            max: (currentMetric === 'power' ? powerAxisMax : (currentMetric === 'voltage' ? 600 : undefined))
-                        },
-                        y_voltage: {
-                            type: 'linear',
-                            position: 'right',
-                            display: (currentMetric === 'power'),
-                            grid: { drawOnChartArea: false },
-                            ticks: { font: { size: 9 } },
-                            title: { display: true, text: 'V', font: { size: 9, weight: 'bold' } },
-                            min: 0,
-                            max: 600
-                        },
                         x: { 
-                            type: 'time',
-                            min: visualRange.min, // Objective 1: Sliding Window
+                            type: 'time', 
+                            min: visualRange.min, 
                             max: visualRange.max,
-                            time: {
-                                tooltipFormat: 'dd/MM HH:mm',
-                                displayFormats: {
-                                    hour: 'HH:mm',
-                                    day: 'dd/MM HH:mm'
-                                }
-                            },
-                            grid: { display: false }, 
-                            ticks: { 
-                                font: { size: 9 }, 
-                                maxRotation: 0, 
-                                autoSkip: true, 
-                                maxTicksLimit: 8
-                            } 
-                        }
-                    },
-                    interaction: { intersect: false },
-                    onClick: (e) => {
-                        const points = chartInstance.getElementsAtEventForMode(e, 'nearest', { intersect: false }, true);
-                        if (points.length) {
-                            const firstPoint = points[0];
-                            const label = chartInstance.data.labels[firstPoint.index];
-                            if(typeof openTagModal === 'function') openTagModal(label);
-                        }
+                            grid: { display: false }
+                        },
+                        y: { min: 0, grid: { color: 'rgba(0,0,0,0.05)' } }
                     }
                 }
             });
 
-            // PATCH 1: Reusable Named Pan Handlers (Prevent Memory Leaks)
-            if (panMouseDownHandler) ctx.canvas.removeEventListener('mousedown', panMouseDownHandler);
-            if (panMouseMoveHandler) window.removeEventListener('mousemove', panMouseMoveHandler);
-            if (panMouseUpHandler) window.removeEventListener('mouseup', panMouseUpHandler);
-
-            let isPanning = false;
-            let startX = 0;
-            let startMin = 0;
-            let startMax = 0;
-
-            panMouseDownHandler = function(e) {
-                if (e.button !== 0) return; 
-                if (!cachedData || !cachedData.length) return;
-
-                isPanning = true;
-                startX = e.clientX;
-                startMin = chartInstance.options.scales.x.min;
-                startMax = chartInstance.options.scales.x.max;
-                ctx.canvas.style.cursor = 'grabbing';
-            };
-
-            panMouseMoveHandler = function(e) {
-                if (!isPanning) return;
-                if (!cachedData || !cachedData.length) return;
-
-                const dx = e.clientX - startX;
-                const pixelPerMs = (startMax - startMin) / chartInstance.width;
-                const shiftMs = dx * pixelPerMs * -1; 
-                
-                let newMin = startMin + shiftMs;
-                let newMax = startMax + shiftMs;
-
-                const cacheMin = new Date(cachedData[0].timestamp).getTime();
-                const cacheMax = new Date(cachedData[cachedData.length - 1].timestamp).getTime();
-
-                if (newMin < cacheMin) { newMin = cacheMin; newMax = newMin + (visualHours * 60 * 60 * 1000); }
-                if (newMax > cacheMax) { newMax = cacheMax; newMin = newMax - (visualHours * 60 * 60 * 1000); }
-
-                visualRange = { min: newMin, max: newMax };
-                chartInstance.options.scales.x.min = newMin;
-                chartInstance.options.scales.x.max = newMax;
-                chartInstance.update('none'); 
-            };
-
-            panMouseUpHandler = function() {
-                if (isPanning) {
-                    isPanning = false;
-                    ctx.canvas.style.cursor = 'default';
+            // Patch 5 & 6: Safe Click Tagging
+            ctx.canvas.onclick = function(e) {
+                if (isReadonly || currentHours !== 4) return;
+                const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+                if (points.length) {
+                    const firstPoint = points[0];
+                    const label = decimatedData[firstPoint.index].timestamp;
+                    openTagModal(label);
                 }
             };
-
-            ctx.canvas.addEventListener('mousedown', panMouseDownHandler);
-            window.addEventListener('mousemove', panMouseMoveHandler);
-            window.addEventListener('mouseup', panMouseUpHandler);
-
-            // Re-draw tags after chart creation
-            if (currentTags.length > 0) drawTagAnnotations(currentTags);
-
-        } catch (error) {
-            console.error('Fatal Chart.js Error:', error);
-            renderEmptyChart();
-        }
-    }
-
-        function renderEmptyChart() {
-            if (chartInstance) {
-                chartInstance.destroy();
-                chartInstance = null;
-            }
-            chartInstance = new Chart(ctx, { type: 'line', data: { labels: ['No Data'], datasets: [] }, options: { maintainAspectRatio: false } });
-            updateHealthPanel('chart', 'NO DATA');
         }
 
-        // Telemetry Global State
-        let currentPage = 1;
-        let lastPage = 1;
-        const machineId = "{{ $machine->id }}";
+        // --- TAGGING & PHASES ---
 
-        // Async Flow Refactor
-        async function initDashboard() {
-            await fetchAndRender();
-            await window.refreshTags();
-            await window.refreshPhases();
-            await fetchReadings(1);
-        }
-        
-        // Execute deterministic init
-        initDashboard();
-        function formatWIB(isoString) {
-            const d = new Date(isoString);
-            const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-            const nd = new Date(utc + (3600000 * 7)); // +7 for WIB
-            const yyyy = nd.getFullYear();
-            const mm   = String(nd.getMonth() + 1).padStart(2, '0');
-            const dd   = String(nd.getDate()).padStart(2, '0');
-            const hh   = String(nd.getHours()).padStart(2, '0');
-            const min  = String(nd.getMinutes()).padStart(2, '0');
-            const ss   = String(nd.getSeconds()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
-        }
-
-        async function fetchReadings(page = 1) {
-            const tbody = document.getElementById('telemetry-tbody');
-            const nextBtn = document.getElementById('next-page');
-            const prevBtn = document.getElementById('prev-page');
-            const pageDisplay = document.getElementById('current-page-display');
-            const lastPageDisplay = document.getElementById('last-page-display');
-            const totalDisplay = document.getElementById('total-readings-display');
-
-            try {
-                let url = `{{ url('api/machines') }}/${machineId}/readings?page=${page}&limit=15`;
-                if (currentFilters.start && currentFilters.end) {
-                    url += `&start_date=${encodeURIComponent(currentFilters.start)}&end_date=${encodeURIComponent(currentFilters.end)}`;
-                }
-                const result = await safeFetch(url);
-
-                if (result.status === 'success') {
-                    const paginator = result.data;
-                    const readings = paginator.data;
-                    updateHealthPanel('telemetry', paginator.total);
-                    
-                    if (tbody) {
-                        tbody.innerHTML = '';
-                        
-                        if (readings.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-outline italic">No telemetry data.</td></tr>';
-                        }
-                    }
-
-                    readings.forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.className = 'border-b border-surface-container-low hover:bg-surface-container-low transition-colors';
-                        const fmtNum = (v, dec=2) => { const n = parseFloat(v); return isNaN(n) ? (0).toFixed(dec) : n.toFixed(dec); };
-                        const timestamp = formatWIB(row.recorded_at);
-                        const statusHtml = row.status_badge;
-                        const quality = row.telemetry_quality || 'GOOD';
-                        const qualityColors = {
-                            'GOOD': 'text-green-600',
-                            'PARTIAL': 'text-orange-500',
-                            'OFFLINE': 'text-slate-400',
-                            'STALE': 'text-amber-600 font-black',
-                            'INTERPOLATED': 'text-blue-500'
-                        };
-                        const qColor = qualityColors[quality] || 'text-outline';
-
-                        tr.innerHTML = `
-                            <td class="px-4 py-2 font-mono text-[10px] text-outline">${timestamp}</td>
-                            <td class="px-4 py-2 text-right font-black text-primary">${fmtNum(row.power_kw)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.voltage, 1)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.current, 1)}</td>
-                            <td class="px-4 py-2 text-right text-on-surface-variant">${fmtNum(row.power_factor)}</td>
-                            <td class="px-4 py-2 text-right font-bold text-on-surface">${fmtNum(row.kwh_total)}</td>
-                            <td class="px-4 py-2 text-center">${statusHtml}</td>
-                            <td class="px-4 py-2 text-center font-black text-[9px] ${qColor}">${quality}</td>
-                            <td class="px-4 py-2 text-right">
-                                <button class="text-primary hover:underline text-[9px] font-black uppercase detail-btn"
-                                    data-timestamp="${timestamp}"
-                                    data-power="${fmtNum(row.power_kw)}"
-                                    data-voltage="${fmtNum(row.voltage, 1)}"
-                                    data-current="${fmtNum(row.current, 1)}"
-                                    data-pf="${fmtNum(row.power_factor)}"
-                                    data-kwh="${fmtNum(row.kwh_total)}"
-                                    data-status_badge='${row.status_badge}'>
-                                    Detail
-                                </button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-
-                    currentPage = paginator.current_page;
-                    lastPage = paginator.last_page;
-                    pageDisplay.innerText = currentPage;
-                    lastPageDisplay.innerText = lastPage;
-                    totalDisplay.innerText = paginator.total;
-                    prevBtn.disabled = currentPage <= 1;
-                    nextBtn.disabled = currentPage >= lastPage;
-                }
-            } catch (error) { 
-                console.error('Error fetching readings:', error);
-                const tbody = document.getElementById('telemetry-tbody');
-                if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-error italic">Failed to load telemetry stream.</td></tr>';
-            }
-        }
-
-        document.getElementById('next-page').addEventListener('click', () => { if (currentPage < lastPage) fetchReadings(currentPage + 1); });
-        document.getElementById('prev-page').addEventListener('click', () => { if (currentPage > 1) fetchReadings(currentPage - 1); });
-
-        // Modal Logic
-        window.openModal = function(data) {
-            document.getElementById('modal-timestamp').innerText = data.timestamp;
-            document.getElementById('modal-power').innerText = data.power;
-            document.getElementById('modal-voltage').innerText = data.voltage;
-            document.getElementById('modal-current').innerText = data.current;
-            document.getElementById('modal-pf').innerText = data.pf;
-            document.getElementById('modal-kwh').innerText = data.kwh;
-            
-            const statusEl = document.getElementById('modal-status');
-            statusEl.innerHTML = data.status_badge;
-
-            const modal = document.getElementById('details-modal');
-            const content = document.getElementById('modal-content');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => { modal.classList.remove('pointer-events-none'); content.classList.remove('scale-95', 'opacity-0'); }, 10);
-        };
-
-        window.closeModal = function() {
-            const modal = document.getElementById('details-modal');
-            const content = document.getElementById('modal-content');
-            content.classList.add('scale-95', 'opacity-0');
-            modal.classList.add('pointer-events-none');
-            setTimeout(() => { modal.classList.remove('flex'); modal.classList.add('hidden'); }, 300);
-        };
-
-        document.body.addEventListener('click', function(e) {
-            if (e.target.classList.contains('detail-btn')) { openModal(e.target.dataset); }
-        });
-
-        // Export Logic
-        const btnExport = document.getElementById('btn-export-excel');
-        if (btnExport) {
-            btnExport.addEventListener('click', function() {
-                const machineId = this.dataset.machineId;
-                
-                // SOURCE OF TRUTH: Use official forensic state, not raw inputs
-                let start = currentFilters.start;
-                let end = currentFilters.end;
-
-                if (!start || !end) {
-                    // Fallback to default 12h only if NO forensic filter is active
-                    const now = new Date();
-                    const startDateObj = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-                    
-                    start = startDateObj.toISOString();
-                    end = now.toISOString();
-                }
-
-                // Client-side validation for 7 days
-                const startDate = new Date(start);
-                const endDate = new Date(end);
-                const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
-
-                if (diffDays > 7) {
-                    alert('⚠️ PERIODE TERLALU BESAR\n\nBatas maksimal download adalah 7 hari.\n\nSilakan pilih rentang waktu yang lebih pendek.');
-                    return;
-                }
-
-                if (diffDays <= 0) {
-                    alert('End date harus setelah start date.');
-                    return;
-                }
-
-                // Redirect to export route
-                const originalContent = btnExport.innerHTML;
-                btnExport.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Exporting...';
-                btnExport.disabled = true;
-
-                const exportUrl = `/monitoring/meters/${machineId}/export?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
-                console.log('Final Export URL:', exportUrl);
-                window.location.href = exportUrl;
-
-                // Reset button after a delay (since we can't easily detect download completion)
-                setTimeout(() => {
-                    btnExport.innerHTML = originalContent;
-                    btnExport.disabled = false;
-                }, 5000);
-            });
-        }
-
-        // Reset Logic
-        const btnLogReset = document.getElementById('btn-log-reset');
-        if (btnLogReset) {
-            btnLogReset.addEventListener('click', async function () {
-                const machineId = this.dataset.machineId;
-                const confirmed = confirm(`⚠️ LOG RESET METER\n\nLakukan ini SEBELUM reset fisik.\nLanjutkan?`);
-                if (!confirmed) return;
-                const notes = prompt('Catatan (opsional):');
-                this.disabled = true; this.innerText = 'SAVING...';
-                try {
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
-                    const result = await safeFetch(`/api/machines/${machineId}/reset`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                        body: JSON.stringify({ notes: notes || '' })
-                    });
-                    if (result.status === 'success') { alert(`✅ Berhasil!`); window.location.reload(); }
-                    else { alert('❌ Gagal: ' + (result.message || 'Error')); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
-                } catch (err) { alert('❌ Error: ' + err.message); this.disabled = false; this.innerHTML = '<span class="material-symbols-outlined text-sm">restart_alt</span> Log New Reset'; }
-            });
-        }
-        // --- MANUAL TAGGING JS ---
-        const phaseSection = document.getElementById('phase-reconstruction-section');
-        const phaseTableBody = document.getElementById('phase-tbody');
-        const tagModal = document.getElementById('tag-modal');
-        let currentTags = [];
-        
         window.openTagModal = function(timestamp, tagData = null) {
-            // Patch 5: UI Hardening for Readonly Users
-            if (isReadonly) {
-                document.getElementById('tag-event-type').disabled = true;
-                document.getElementById('tag-shift').disabled = true;
-                document.getElementById('tag-notes').disabled = true;
-                document.getElementById('btn-save-tag').classList.add('hidden');
-                
-                // Show Readonly Badge
-                const titleEl = document.getElementById('tag-modal-title');
-                titleEl.innerHTML = (tagData ? 'View Tag' : 'Create Tag') + ' <span class="ml-2 px-2 py-0.5 bg-surface-container text-outline rounded text-[8px] uppercase tracking-widest">READONLY</span>';
-            }
+            if (isReadonly || (currentHours !== 4 && !tagData)) return;
 
-            document.getElementById('tag-timestamp').value = formatWIB(timestamp);
+            const tsInput = document.getElementById('tag-timestamp');
+            tsInput.value = formatWIB(timestamp);
+            tsInput.setAttribute('data-iso', timestamp); // Patch 7: Store ISO
+
+            const idField = document.getElementById('tag-id');
+            const typeField = document.getElementById('tag-event-type');
+            const shiftField = document.getElementById('tag-shift');
+            const notesField = document.getElementById('tag-notes');
+            const deleteBtn = document.getElementById('btn-delete-tag');
+
             if (tagData) {
-                document.getElementById('tag-id').value = tagData.id;
-                document.getElementById('tag-event-type').value = tagData.event_type;
-                document.getElementById('tag-shift').value = tagData.shift || '1';
-                document.getElementById('tag-notes').value = tagData.notes || '';
-                if (!isReadonly) document.getElementById('tag-modal-title').innerText = 'Edit Operational Tag';
-                
-                const deleteBtn = document.getElementById('btn-delete-tag');
+                idField.value = tagData.id;
+                typeField.value = tagData.event_type;
+                shiftField.value = tagData.shift || '1';
+                notesField.value = tagData.notes || '';
                 if (deleteBtn && !isReadonly) {
                     deleteBtn.classList.remove('hidden');
                     deleteBtn.onclick = function() { deleteTag(tagData.id); };
                 }
             } else {
-                document.getElementById('tag-id').value = '';
-                document.getElementById('tag-event-type').value = 'start';
-                document.getElementById('tag-shift').value = '1';
-                document.getElementById('tag-notes').value = '';
-                if (!isReadonly) document.getElementById('tag-modal-title').innerText = 'Create Operational Tag';
-                
-                const deleteBtn = document.getElementById('btn-delete-tag');
+                idField.value = '';
+                typeField.value = 'start';
+                shiftField.value = '1';
+                notesField.value = '';
                 if (deleteBtn) deleteBtn.classList.add('hidden');
             }
+            
             tagModal.classList.remove('hidden');
         };
 
-        window.closeTagModal = function() {
-            tagModal.classList.add('hidden');
-        };
+        window.closeTagModal = function() { tagModal.classList.add('hidden'); };
 
-        window.saveTag = async function() {
-            const btnSave = document.querySelector('#tag-modal button[onclick="saveTag()"]');
-            btnSave.disabled = true;
-            btnSave.innerHTML = '<span class="animate-spin material-symbols-outlined text-[10px]">sync</span> Saving...';
-
+        window.saveTag = function() {
             const id = document.getElementById('tag-id').value;
-            const data = {
-                event_time: document.getElementById('tag-timestamp').value,
+            const url = id ? `/api/tags/${id}` : `/api/machines/${deviceId}/tags`;
+            const method = id ? 'PUT' : 'POST';
+            
+            // Patch 7: Store Raw ISO Timestamp internally
+            const rawTimestamp = document.getElementById('tag-timestamp').getAttribute('data-iso') || 
+                               document.getElementById('tag-timestamp').value;
+
+            const payload = {
+                event_time: rawTimestamp,
                 event_type: document.getElementById('tag-event-type').value,
                 shift: document.getElementById('tag-shift').value,
                 notes: document.getElementById('tag-notes').value
             };
 
-            try {
-                const url = id ? `/api/tags/${id}` : `/api/machines/${machineId}/tags`;
-                const method = id ? 'PUT' : 'POST';
-                const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
-                
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken 
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                if (response.ok) {
+            safeFetch(url, { method: method, body: JSON.stringify(payload) })
+                .then(function() {
                     closeTagModal();
-                    await window.refreshTags();
-                    await window.refreshPhases();
-                } else {
-                    if (result.status === 'VALID_WITH_WARNING') {
-                        if(confirm('Warning: ' + result.message + '\n\nDo you want to proceed anyway?')) {
-                            data.force = true;
-                            // Retry with force
-                            const retryResponse = await fetch(url, {
-                                method: method,
-                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                                body: JSON.stringify(data)
-                            });
-                            if (retryResponse.ok) {
-                                closeTagModal();
-                                await window.refreshTags();
-                                await window.refreshPhases();
-                            } else {
-                                alert((await retryResponse.json()).message || 'Validation failed.');
-                            }
-                        }
-                    } else {
-                        alert(result.message || 'Validation failed.');
-                    }
-                }
-            } catch (e) {
-                alert('Error saving tag.');
-                console.error(e);
-            } finally {
-                btnSave.disabled = false;
-                btnSave.innerText = 'SAVE TAG';
-            }
+                    initDashboard();
+                })
+                .catch(function(err) { alert(err.message || 'Validation failed'); });
         };
 
-        window.deleteTag = async function(id) {
-            // Patch 4: Delete Must Require Explicit Reason (Frontend)
-            const reason = prompt('INDUSTRIAL GOVERNANCE: Please state forensic reason for deleting this tag (Minimum 10 characters):');
-            if (!reason || reason.length < 10) {
-                alert('Action Aborted: A valid forensic reason (min 10 chars) is mandatory.');
-                return;
-            }
-
-            if (!confirm('Are you sure you want to SOFT DELETE this tag? It will be preserved in audit logs.')) return;
-            try {
-                const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
-                const response = await fetch(`/api/tags/${id}`, {
-                    method: 'DELETE',
-                    headers: { 
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ reason: reason })
-                });
-                if (response.ok) {
-                    closeTagModal();
-                    await window.refreshTags();
-                    await window.refreshPhases();
-                } else {
-                    const err = await response.json();
-                    alert(err.message || 'Error deleting tag');
-                }
-            } catch (error) {
-                console.error('Delete tag failed:', error);
-            }
-        };
-
-        window.refreshTags = async function() {
-            let end = new Date();
-            let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+        window.deleteTag = function(id) {
+            const reason = prompt('Industrial Delete Reason (Min 10 chars):');
+            if (!reason || reason.length < 10) return alert('Invalid reason.');
             
-            if (currentFilters.start && currentFilters.end) {
-                start = new Date(currentFilters.start);
-                end = new Date(currentFilters.end);
-            }
-
-            try {
-                const tags = await safeFetch(`/api/machines/${machineId}/tags?start=${start.toISOString()}&end=${end.toISOString()}`);
-                currentTags = tags;
-                updateHealthPanel('tags', tags.length);
-                drawTagAnnotations(tags);
-                renderTimeline(tags);
-            } catch (e) {
-                console.error("Error fetching tags", e);
-            }
+            if (!confirm('Confirm soft delete?')) return;
+            
+            safeFetch(`/api/tags/${id}`, { method: 'DELETE', body: JSON.stringify({ reason: reason }) })
+                .then(function() {
+                    closeTagModal();
+                    initDashboard();
+                });
         };
+
+        function updateHealthPanel(key, value) {
+            const el = document.getElementById('health-' + key);
+            if (el) el.textContent = value;
+            document.getElementById('health-last-refresh').textContent = new Date().toLocaleTimeString();
+        }
+
+        function loadTags() {
+            safeFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
+                .then(function(tags) {
+                    currentTags = tags;
+                    updateHealthPanel('tags', tags.length);
+                    renderTimeline(tags);
+                    drawTagAnnotations(tags);
+                });
+        }
+
+        function loadPhases() {
+            safeFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
+                .then(function(phases) {
+                    updateHealthPanel('phases', phases.length);
+                    renderPhases(phases);
+                });
+        }
+
+        // Patch 4: Filter Tag Annotations by Visible Window
+        function drawTagAnnotations(tags) {
+            if (!chartInstance || !visualRange.min || !visualRange.max) return;
+            const annotations = {};
+            
+            tags.forEach(function(t) {
+                if (t.deleted_at) return;
+                
+                const time = new Date(t.event_time).getTime();
+                // Performance: Only render if within visual range
+                if (time < visualRange.min || time > visualRange.max) return;
+
+                annotations[`tag_${t.id}`] = {
+                    type: 'line', xMin: t.event_time, xMax: t.event_time,
+                    borderColor: getEventColor(t.event_type), borderWidth: 2, borderDash: [4, 4],
+                    label: { 
+                        content: t.event_type.toUpperCase(), 
+                        display: true, 
+                        position: 'start', 
+                        backgroundColor: getEventColor(t.event_type), 
+                        color: '#fff', 
+                        font: { size: 9, weight: 'bold' }, 
+                        padding: 4 
+                    }
+                };
+            });
+            chartInstance.options.plugins.annotation.annotations = annotations;
+            chartInstance.update('none');
+        }
 
         function renderTimeline(tags) {
             const container = document.getElementById('timeline-content');
             if (!container) return;
             container.innerHTML = '';
-            
-            if(tags.length === 0) {
-                container.innerHTML = '<div class="text-center py-4 text-outline italic">No operational tags found.</div>';
-                return;
-            }
-
-            tags.forEach(t => {
+            tags.forEach(function(t) {
                 const div = document.createElement('div');
-                div.className = 'p-2 rounded border border-surface-container bg-white shadow-sm hover:bg-surface-container-lowest cursor-pointer transition-colors relative overflow-hidden';
-                div.onclick = () => openTagModal(t.event_time, t);
-                
-                const timeStr = formatWIB(t.event_time).split(' ')[1];
-                
-                // Objective 8: Timeline Revision Badges
-                let statusBadge = '';
-                if (t.deleted_at) {
-                    statusBadge = `<span class="px-1 py-0.5 ml-1 bg-error-container text-error text-[7px] font-black rounded uppercase">DELETED</span>`;
-                } else if (t.edited_at) {
-                    statusBadge = `<span class="px-1 py-0.5 ml-1 bg-secondary-container text-on-secondary-container text-[7px] font-black rounded uppercase">EDITED</span>`;
-                }
-                
+                div.className = 'p-2 rounded border border-surface-container bg-white mb-2 cursor-pointer';
+                div.onclick = function() { openTagModal(t.event_time, t); };
                 div.innerHTML = `
                     <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-on-surface">${timeStr}</span>
-                        <div class="flex items-center gap-1">
-                            ${statusBadge}
-                            <span class="px-1.5 py-0.5 rounded text-white text-[8px] uppercase tracking-widest shadow-sm" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center text-outline text-[8px]">
-                        <span class="truncate pr-1">By: ${t.tagger ? t.tagger.name : 'System'}</span>
-                        <span class="text-[7px] opacity-60">${t.shift ? 'S' + t.shift : ''}</span>
+                        <span class="font-bold text-[10px]">${formatWIB(t.event_time).split(' ')[1]}</span>
+                        <span class="px-1 py-0.5 rounded text-white text-[8px] uppercase font-black" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
                     </div>
                 `;
                 container.appendChild(div);
             });
         }
 
-        window.refreshPhases = async function() {
-            let end = new Date();
-            let start = new Date(end.getTime() - currentHours * 60 * 60 * 1000);
+        // Patch 2: Structural Operational Phase Table
+        function renderPhases(phases) {
+            if (!phaseTableBody) return;
+            phaseTableBody.innerHTML = '';
             
-            if (currentFilters.start && currentFilters.end) {
-                start = new Date(currentFilters.start);
-                end = new Date(currentFilters.end);
+            if (phases.length === 0) {
+                phaseSection.classList.add('hidden');
+                return;
             }
+            phaseSection.classList.remove('hidden');
 
-            phaseTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><span class="animate-spin material-symbols-outlined">sync</span> Loading phases...</td></tr>';
-            try {
-                const phases = await safeFetch(`/api/machines/${machineId}/phases?start=${start.toISOString()}&end=${end.toISOString()}`);
-                updateHealthPanel('phases', phases.length);
-                renderPhases(phases);
-            } catch (e) {
-                console.error("Error fetching phases", e);
-                phaseTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-error">Failed to load phases.</td></tr>';
-            }
-        };
+            phases.forEach(function(p) {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-surface-container hover:bg-surface-container-low transition-colors';
+                
+                const statusBadge = p.status === 'OPEN' 
+                    ? '<span class="px-2 py-0.5 bg-primary/10 text-primary rounded font-black text-[8px] animate-pulse uppercase">Active</span>'
+                    : '<span class="px-2 py-0.5 bg-outline/10 text-outline rounded font-black text-[8px] uppercase">Closed</span>';
+
+                tr.innerHTML = `
+                    <td class="px-4 py-2 font-mono text-[10px] text-outline">${formatWIB(p.start_time).split(' ')[1]}</td>
+                    <td class="px-4 py-2 font-mono text-[10px] text-outline">${formatWIB(p.end_time).split(' ')[1]}</td>
+                    <td class="px-4 py-2 text-center">${statusBadge}</td>
+                    <td class="px-4 py-2 text-primary font-black uppercase text-[10px]">${p.phase_name}</td>
+                    <td class="px-4 py-2 text-right font-bold text-on-surface">${p.duration_human}</td>
+                    <td class="px-4 py-2 text-right font-medium text-outline">${p.avg_kw}</td>
+                    <td class="px-4 py-2 text-right font-medium text-outline">${p.peak_kw}</td>
+                    <td class="px-4 py-2 text-right font-black text-on-surface">${p.usage_kwh}</td>
+                    <td class="px-4 py-2 text-right font-black text-tertiary">Rp ${p.est_cost.toLocaleString()}</td>
+                `;
+                phaseTableBody.appendChild(tr);
+            });
+        }
 
         function getEventColor(type) {
-            const colors = {
-                'start': 'rgba(16, 185, 129, 0.8)', // green
-                'melting': 'rgba(249, 115, 22, 0.8)', // orange
-                'idle': 'rgba(148, 163, 184, 0.8)', // slate
-                'test': 'rgba(234, 179, 8, 0.8)', // yellow
-                'pour': 'rgba(59, 130, 246, 0.8)', // blue
-                'end': 'rgba(239, 68, 68, 0.8)' // red
-            };
-            return colors[type] || 'rgba(148, 163, 184, 0.8)';
+            const c = { start: '#10b981', melting: '#f97316', idle: '#94a3b8', test: '#eab308', pour: '#3b82f6', end: '#ef4444' };
+            return c[type] || '#94a3b8';
         }
 
-        function drawTagAnnotations(tags) {
-            if (!chartInstance) return;
-            
-            // Patch 2: Safe deep clone
-            const currentAnnotations = window.structuredClone
-                ? structuredClone(baseAnnotations || {})
-                : JSON.parse(JSON.stringify(baseAnnotations || {}));
-            
-            tags.forEach(function(t) {
-                // Filter out deleted tags from chart (Objective 6)
-                if (t.deleted_at) return;
+        // Patch 3: Browser-Safe Time Formatting (No double offset)
+        function formatWIB(iso) {
+            if (!iso) return '-';
+            const date = new Date(iso);
+            return new Intl.DateTimeFormat('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).format(date).replace(/\//g, '-');
+        }
 
-                currentAnnotations[`tag_${t.id}`] = {
-                    type: 'line',
-                    xMin: t.event_time,
-                    xMax: t.event_time,
-                    borderColor: getEventColor(t.event_type),
-                    borderWidth: 2,
-                    borderDash: [4, 4],
-                    label: {
-                        content: t.event_type.toUpperCase(),
-                        display: true,
-                        position: 'start',
-                        backgroundColor: getEventColor(t.event_type),
-                        color: '#fff',
-                        font: { size: 9, weight: 'bold' },
-                        padding: 4,
-                        z: 10
-                    },
-                    enter(ctx, event) {
-                        ctx.chart.canvas.style.cursor = 'pointer';
-                    },
-                    leave(ctx, event) {
-                        ctx.chart.canvas.style.cursor = 'default';
-                    },
-                    click(ctx, event) {
-                        openTagModal(t.event_time, t);
-                    }
-                };
+        function initDashboard() {
+            loadChartData().then(function() {
+                loadTags();
+                loadPhases();
             });
-
-            chartInstance.options.plugins.annotation.annotations = currentAnnotations;
-            chartInstance.update('none'); // Update without animation for pan stability
         }
 
-        function renderPhases(phases) {
-            phaseTableBody.innerHTML = '';
-            if (phases.length > 0) {
-                phaseSection.classList.remove('hidden');
-                
-                // Summaries
-                let totalDur = 0;
-                let totalUsage = 0;
-                let totalPhases = phases.length;
-
-                phases.forEach(p => {
-                    totalDur += p.duration_minutes;
-                    totalUsage += p.usage_kwh;
-                    
-                    const tr = document.createElement('tr');
-                    tr.className = p.status === 'OPEN' ? 'bg-primary/5 hover:bg-primary/10 transition-colors' : 'hover:bg-surface-container-low transition-colors bg-white';
-                    
-                    const statusHtml = p.status === 'OPEN' 
-                        ? '<span class="px-2 py-0.5 bg-primary/20 text-primary rounded font-black text-[8px] animate-pulse">IN PROGRESS</span>'
-                        : '<span class="px-2 py-0.5 bg-surface-container-high text-outline rounded font-black text-[8px]">CLOSED</span>';
-                        
-                    tr.innerHTML = `
-                        <td class="px-4 py-2 font-mono text-outline">${formatWIB(p.start_time).split(' ')[1]}</td>
-                        <td class="px-4 py-2 font-mono text-outline">${formatWIB(p.end_time).split(' ')[1]}</td>
-                        <td class="px-4 py-2 text-center">${statusHtml}</td>
-                        <td class="px-4 py-2 font-black uppercase text-primary">${p.phase_name}</td>
-                        <td class="px-4 py-2 text-right font-black">${p.duration_human}</td>
-                        <td class="px-4 py-2 text-right text-outline">${p.avg_kw}</td>
-                        <td class="px-4 py-2 text-right text-outline">${p.peak_kw}</td>
-                        <td class="px-4 py-2 text-right font-black text-on-surface">${p.usage_kwh}</td>
-                        <td class="px-4 py-2 text-right font-black text-tertiary">Rp ${p.est_cost.toLocaleString()}</td>
-                    `;
-                    phaseTableBody.appendChild(tr);
-                });
-                
-                // Add Summary Row
-                const summaryTr = document.createElement('tr');
-                summaryTr.className = 'bg-surface-container-low font-black text-[10px] text-on-surface uppercase';
-                summaryTr.innerHTML = `
-                    <td colspan="4" class="px-4 py-2 text-right">TOTALS (${totalPhases} PHASES)</td>
-                    <td class="px-4 py-2 text-right text-primary">${totalDur}m</td>
-                    <td colspan="2" class="px-4 py-2 text-right"></td>
-                    <td class="px-4 py-2 text-right text-primary">${totalUsage.toFixed(2)} kWh</td>
-                    <td class="px-4 py-2 text-right"></td>
-                `;
-                phaseTableBody.appendChild(summaryTr);
-                
-            } else {
-                phaseSection.classList.add('hidden');
-            }
-        }
-        // Intentionally left blank, initialization handled by initDashboard();
-
+        initDashboard();
     });
 </script>
-@endsection
