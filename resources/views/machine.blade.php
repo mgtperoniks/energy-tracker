@@ -399,24 +399,11 @@
         let cachedData = [];
         let visualRange = { min: null, max: null };
         let currentTags = [];
-        let activeRequests = {}; // Patch 2: Scoped Collision Protection
+        let activeRequests = {}; // Temporarily unused in recovery
         let forensicBusy = false; // Patch 5: Spam Protection
         
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         const isReadonly = !['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'].includes('{{ auth()->user()->email }}');
-
-        // Patch 2: Collision Guarded Fetch (Scoped by category)
-        function guardedFetch(url, category, options) {
-            const requestId = (activeRequests[category] || 0) + 1;
-            activeRequests[category] = requestId;
-            return safeFetch(url, options).then(function(res) {
-                if (requestId !== activeRequests[category]) {
-                    console.warn('Ignoring stale ' + category + ' response', url);
-                    return new Promise(function(){}); // Never resolve stale requests
-                }
-                return res;
-            });
-        }
 
         // Patch 6: Hardened safeFetch with non-JSON fallback
         function safeFetch(url, options) {
@@ -496,7 +483,7 @@
             currentHours = 4;
             updateRange(4); // Ensure mode UI is correct
 
-            guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`, 'chart')
+            safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`)
                 .then(function(response) {
                     cachedData = response.data || [];
                     const vTarget = target.getTime();
@@ -545,7 +532,7 @@
                 const end = new Date();
                 const start = new Date(end.getTime() - (fetchHours * 60 * 60 * 1000));
 
-                return guardedFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`, 'chart')
+                return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                     .then(function(response) {
                         cachedData = response.data || [];
                         updateHealthPanel('telemetry', cachedData.length);
@@ -660,6 +647,8 @@
                 }
             });
 
+            console.log('Industrial Recovery: Chart rendered with ' + labels.length + ' points.');
+
             // Patch 5 & 6: Safe Click Tagging
             ctx.canvas.onclick = function(e) {
                 if (isReadonly || currentHours !== 4) return;
@@ -757,7 +746,7 @@
 
         function loadTags() {
             try {
-                guardedFetch(`{{ url('api/machines') }}/${deviceId}/tags`, 'tags')
+                safeFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
                     .then(function(tags) {
                         currentTags = tags;
                         updateHealthPanel('tags', tags.length);
@@ -770,7 +759,7 @@
 
         function loadPhases() {
             try {
-                guardedFetch(`{{ url('api/machines') }}/${deviceId}/phases`, 'phases')
+                safeFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
                     .then(function(phases) {
                         updateHealthPanel('phases', phases.length);
                         renderPhases(phases);
@@ -900,7 +889,7 @@
         function loadTelemetry(page = 1) {
             try {
                 const url = `{{ url('api/machines') }}/${deviceId}/readings?limit=15&page=${page}`;
-                return guardedFetch(url, 'telemetry')
+                return safeFetch(url)
                     .then(function(response) {
                     const data = response.data;
                     const tbody = document.getElementById('telemetry-tbody');
@@ -987,11 +976,10 @@
 
         function initDashboard() {
             try {
-                loadChartData().then(function() {
-                    loadTags();
-                    loadPhases();
-                    loadTelemetry();
-                });
+                loadChartData();
+                loadTags();
+                loadPhases();
+                loadTelemetry();
             } catch (e) {
                 console.error('Dashboard Init Failed:', e);
                 updateHealthPanel('status', 'INIT FAIL', 'text-error');
