@@ -449,6 +449,7 @@
         let cachedData = [];
         let visualRange = { min: null, max: null };
         let currentTags = [];
+        let currentPhases = [];
         let activeRequests = {}; // Temporarily unused in recovery
         let forensicBusy = false; // Patch 5: Spam Protection
         
@@ -743,6 +744,10 @@
                         }
                     };
                 }
+                
+                // Redraw annotations (Tags + Phases)
+                redrawAnnotations();
+
             } catch (err) {
                 console.error('renderChart failed', err);
             }
@@ -861,7 +866,7 @@
                         currentTags = tags;
                         updateHealthPanel('tags', tags.length);
                         renderTimeline(tags);
-                        drawTagAnnotations(tags);
+                        redrawAnnotations();
                     })
                     .catch(function(e) { updateHealthPanel('status', 'TAG ERR', 'text-error'); });
             } catch(err) { console.error('loadTags Crash:', err); }
@@ -871,26 +876,64 @@
             try {
                 safeFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
                     .then(function(phases) {
+                        currentPhases = phases;
                         updateHealthPanel('phases', phases.length);
                         renderPhases(phases);
+                        redrawAnnotations();
                     })
                     .catch(function(e) { updateHealthPanel('status', 'PHASE ERR', 'text-error'); });
             } catch(err) { console.error('loadPhases Crash:', err); }
         }
 
-        // Patch 4: Filter Tag Annotations by Visible Window
-        function drawTagAnnotations(tags) {
+        // Patch 4: Consolidated Industrial Process Annotations (Tags + Phase Bands)
+        function redrawAnnotations() {
             if (!chartInstance || !visualRange.min || !visualRange.max) return;
             const annotations = {};
-            
-            tags.forEach(function(t) {
-                if (t.deleted_at) return;
+            let phaseCount = 0;
+
+            // 1. Process Phase Bands (Box Overlays)
+            currentPhases.forEach(function(p, i) {
+                const startTs = new Date(p.start_time).getTime();
+                const endTs = new Date(p.end_time).getTime();
                 
+                // Performance: Only render if overlaps visible viewport
+                if (endTs < visualRange.min || startTs > visualRange.max) return;
+                if (phaseCount >= 15) return; // Cap for performance safety
+                phaseCount++;
+
+                annotations['phase_' + i] = {
+                    type: 'box',
+                    xMin: p.start_time,
+                    xMax: p.end_time,
+                    backgroundColor: getPhaseOverlayColor(p.phase.toLowerCase()),
+                    borderWidth: 0,
+                    drawTime: 'beforeDatasetsDraw',
+                    label: {
+                        display: true,
+                        content: [p.phase_name.toUpperCase(), p.duration_human],
+                        position: 'center',
+                        color: 'rgba(0,0,0,0.5)',
+                        font: { size: 10, weight: 'bold' },
+                        padding: 4
+                    },
+                    enter: function(ctx) {
+                        ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase()).replace('0.12', '0.25').replace('0.15', '0.3').replace('0.10', '0.2');
+                        ctx.chart.update('none');
+                    },
+                    leave: function(ctx) {
+                        ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase());
+                        ctx.chart.update('none');
+                    }
+                };
+            });
+
+            // 2. Tag Event Lines (Existing)
+            currentTags.forEach(function(t) {
+                if (t.deleted_at) return;
                 const time = new Date(t.event_time).getTime();
-                // Performance: Only render if within visual range
                 if (time < visualRange.min || time > visualRange.max) return;
 
-                annotations[`tag_${t.id}`] = {
+                annotations['tag_' + t.id] = {
                     type: 'line', xMin: t.event_time, xMax: t.event_time,
                     borderColor: getEventColor(t.event_type), borderWidth: 2, borderDash: [4, 4],
                     label: { 
@@ -904,8 +947,25 @@
                     }
                 };
             });
+
             chartInstance.options.plugins.annotation.annotations = annotations;
             chartInstance.update('none');
+        }
+
+        function getPhaseOverlayColor(type) {
+            const c = { 
+                start: 'rgba(255, 193, 7, 0.12)',     // PRE-HEATING
+                melting: 'rgba(255, 87, 34, 0.15)',   // MELTING
+                pour: 'rgba(33, 150, 243, 0.12)',      // POURING
+                idle: 'rgba(158, 158, 158, 0.10)',     // IDLE
+                test: 'rgba(158, 158, 158, 0.10)',     // TEST (using IDLE color)
+                end: 'rgba(244, 67, 54, 0.10)'         // END
+            };
+            return c[type] || 'rgba(158, 158, 158, 0.05)';
+        }
+
+        function drawTagAnnotations() {
+            redrawAnnotations(); // Legacy bridge
         }
 
         function renderTimeline(tags) {
