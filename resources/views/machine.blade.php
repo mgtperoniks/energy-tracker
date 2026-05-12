@@ -623,6 +623,62 @@
 
         // Patch 2 & 9: Stable Render (No free-drag pan)
         // Patch 9: Chart decimation (Max 3000 points)
+        // Patch 10: Industrial Phase Overlay Plugin (Native Canvas Rendering)
+        const industrialPhaseOverlayPlugin = {
+            id: 'industrialPhaseOverlay',
+            beforeDatasetsDraw(chart) {
+                if (!currentPhases.length || !decimatedData.length) return;
+                const { ctx, chartArea, scales: { x: xScale } } = chart;
+
+                currentPhases.forEach(function(p) {
+                    const startTs = new Date(p.start_time).getTime();
+                    const endTs = new Date(p.end_time).getTime();
+
+                    // Performance: Only render if overlaps visible viewport
+                    if (endTs < visualRange.min || startTs > visualRange.max) return;
+
+                    // Map timestamps to Indices for Category Scale Precision
+                    let idxMin = -1;
+                    let idxMax = -1;
+                    for (let d = 0; d < decimatedData.length; d++) {
+                        const ts = new Date(decimatedData[d].timestamp).getTime();
+                        if (idxMin === -1 && ts >= startTs) idxMin = d;
+                        if (ts <= endTs) idxMax = d;
+                    }
+
+                    if (idxMin !== -1 && idxMax !== -1 && idxMax >= idxMin) {
+                        const xStart = xScale.getPixelForValue(idxMin);
+                        const xEnd = xScale.getPixelForValue(idxMax);
+                        const width = xEnd - xStart;
+
+                        // Only draw if within chartArea
+                        const xDrawStart = Math.max(xStart, chartArea.left);
+                        const xDrawEnd = Math.min(xEnd, chartArea.right);
+                        const drawWidth = xDrawEnd - xDrawStart;
+
+                        if (drawWidth <= 0) return;
+
+                        ctx.save();
+                        ctx.fillStyle = getPhaseOverlayColor(p.phase.toLowerCase());
+                        ctx.fillRect(xDrawStart, chartArea.top, drawWidth, chartArea.bottom - chartArea.top);
+
+                        // Draw Centered Labels (if region is wide enough)
+                        if (width > 80) {
+                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                            ctx.font = 'bold 10px Inter, sans-serif';
+                            ctx.textAlign = 'center';
+                            const centerX = xStart + (width / 2);
+                            if (centerX > chartArea.left && centerX < chartArea.right) {
+                                ctx.fillText(p.phase_name.toUpperCase(), centerX, chartArea.top + 20);
+                                ctx.fillText(p.duration_human, centerX, chartArea.top + 32);
+                            }
+                        }
+                        ctx.restore();
+                    }
+                });
+            }
+        };
+
         function renderChart(data) {
             try {
                 if (chartInstance) {
@@ -697,7 +753,8 @@
                                 legend: { display: false },
                                 tooltip: { enabled: true },
                                 annotation: { annotations: {} },
-                                decimation: { enabled: false }
+                                decimation: { enabled: false },
+                                industrialPhaseOverlay: true // Enable custom plugin
                             },
                             scales: {
                                 x: { 
@@ -723,7 +780,8 @@
                                     min: 0
                                 }
                             }
-                        }
+                        },
+                        plugins: [industrialPhaseOverlayPlugin] // Register custom plugin
                     });
                 } catch(chartErr) {
                     console.error('CHART INIT FAILED', chartErr);
@@ -886,61 +944,12 @@
             } catch(err) { console.error('loadPhases Crash:', err); }
         }
 
-        // Patch 4: Consolidated Industrial Process Annotations (Tags + Phase Bands)
+        // Patch 4: Consolidated Industrial Process Annotations (Tags Only)
         function redrawAnnotations() {
             if (!chartInstance || !visualRange.min || !visualRange.max || !decimatedData.length) return;
             const annotations = {};
-            let phaseCount = 0;
 
-            // 1. Process Phase Bands (Box Overlays)
-            currentPhases.forEach(function(p, i) {
-                const startTs = new Date(p.start_time).getTime();
-                const endTs = new Date(p.end_time).getTime();
-                
-                // Performance: Only render if overlaps visible viewport
-                if (endTs < visualRange.min || startTs > visualRange.max) return;
-                
-                // Map timestamps to Indices for Category Scale Precision
-                let idxMin = -1;
-                let idxMax = -1;
-                for(let d=0; d < decimatedData.length; d++) {
-                    const ts = new Date(decimatedData[d].timestamp).getTime();
-                    if (idxMin === -1 && ts >= startTs) idxMin = d;
-                    if (ts <= endTs) idxMax = d;
-                }
-
-                if (idxMin !== -1 && idxMax !== -1 && idxMax >= idxMin) {
-                    if (phaseCount >= 15) return; // Cap for performance safety
-                    phaseCount++;
-
-                    annotations['phase_' + i] = {
-                        type: 'box',
-                        xMin: idxMin,
-                        xMax: idxMax,
-                        backgroundColor: getPhaseOverlayColor(p.phase.toLowerCase()),
-                        borderWidth: 0,
-                        drawTime: 'beforeDatasetsDraw',
-                        label: {
-                            display: true,
-                            content: [p.phase_name.toUpperCase(), p.duration_human],
-                            position: 'center',
-                            color: 'rgba(0,0,0,0.5)',
-                            font: { size: 10, weight: 'bold' },
-                            padding: 4
-                        },
-                        enter: function(ctx) {
-                            ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase()).replace('0.12', '0.25').replace('0.15', '0.3').replace('0.10', '0.2');
-                            ctx.chart.update('none');
-                        },
-                        leave: function(ctx) {
-                            ctx.element.options.backgroundColor = getPhaseOverlayColor(p.phase.toLowerCase());
-                            ctx.chart.update('none');
-                        }
-                    };
-                }
-            });
-
-            // 2. Tag Event Lines (Existing)
+            // 1. Tag Event Lines (Preserved from SCADA design)
             currentTags.forEach(function(t) {
                 if (t.deleted_at) return;
                 const time = new Date(t.event_time).getTime();
