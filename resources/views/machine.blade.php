@@ -285,6 +285,33 @@
             </div>
         </div>
 
+        <!-- DELETE CONFIRMATION MODAL -->
+        <div id="delete-tag-modal" class="fixed inset-0 z-[80] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-md transition-all animate-in fade-in duration-300">
+            <div class="bg-white w-full max-w-sm rounded shadow-2xl border border-surface-container overflow-hidden">
+                <div class="px-4 py-3 bg-error/10 border-b border-error/20 flex justify-between items-center">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-error">Delete Forensic Tag</h3>
+                    <button onclick="closeDeleteModal()" class="text-outline hover:text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <input type="hidden" id="delete-tag-id">
+                    <div class="bg-surface-container-low p-2 rounded border border-surface-container">
+                        <p class="text-[9px] text-outline font-bold uppercase tracking-widest mb-1">Target Tag</p>
+                        <p class="text-[11px] font-black text-on-surface" id="delete-tag-info"></p>
+                    </div>
+                    <div>
+                        <label class="text-[8px] font-black text-outline uppercase tracking-widest block mb-1">Reason for deletion (Min 10 chars)</label>
+                        <textarea id="delete-tag-reason" class="w-full bg-white text-xs px-2 py-1.5 rounded font-medium text-on-surface outline-none border border-surface-container focus:border-error h-24 resize-none" placeholder="Provide forensic explanation for this deletion..."></textarea>
+                    </div>
+                </div>
+                <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container flex gap-2 justify-end">
+                    <button onclick="closeDeleteModal()" class="px-4 py-2 text-outline font-black rounded text-[9px] uppercase tracking-widest hover:bg-surface-container transition-all">Cancel</button>
+                    <button onclick="confirmDeleteTag()" class="px-4 py-2 bg-error text-white font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Confirm Delete</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Event Log Section - Full Width Compact -->
         <div class="bg-surface-container-lowest rounded border border-surface-container shadow-sm mb-4">
             <div class="px-4 py-2 border-b border-surface-container-low bg-surface-container-low/30 flex justify-between items-center">
@@ -783,16 +810,39 @@
         };
 
         window.deleteTag = function(id) {
-            const reason = prompt('Industrial Delete Reason (Min 10 chars):');
-            if (!reason || reason.length < 10) return alert('Invalid reason.');
+            // Deprecated direct delete, now using modal
+        };
+
+        window.openDeleteModal = function(id, timestamp, type) {
+            if (isReadonly) return;
+            document.getElementById('delete-tag-id').value = id;
+            document.getElementById('delete-tag-info').textContent = formatWIB(timestamp).split(' ')[1] + ' - ' + type.toUpperCase();
+            document.getElementById('delete-tag-reason').value = '';
+            document.getElementById('delete-tag-modal').classList.remove('hidden');
+        };
+
+        window.closeDeleteModal = function() {
+            document.getElementById('delete-tag-modal').classList.add('hidden');
+        };
+
+        window.confirmDeleteTag = function() {
+            const id = document.getElementById('delete-tag-id').value;
+            const reason = document.getElementById('delete-tag-reason').value;
             
-            if (!confirm('Confirm soft delete?')) return;
+            if (!reason || reason.length < 10) {
+                return alert('Forensic reason must be at least 10 characters.');
+            }
             
-            safeFetch(`/api/tags/${id}`, { method: 'DELETE', body: JSON.stringify({ reason: reason }) })
-                .then(function() {
-                    closeTagModal();
-                    initDashboard();
-                });
+            safeFetch(`/api/tags/${id}`, { 
+                method: 'DELETE', 
+                body: JSON.stringify({ reason: reason }) 
+            })
+            .then(function() {
+                closeDeleteModal();
+                closeTagModal();
+                initDashboard();
+            })
+            .catch(function(err) { alert(err.message || 'Deletion failed'); });
         };
 
         function updateHealthPanel(key, value, textColor = 'text-on-surface') {
@@ -875,10 +925,20 @@
                 
                 const color = getEventColor(t.event_type);
                 
+                const deleteBtn = isReadonly ? '' : `
+                    <button onclick="event.stopPropagation(); openDeleteModal(${t.id}, '${t.event_time}', '${t.event_type}')" 
+                            class="px-2 py-1 border border-error/40 text-error hover:bg-error hover:text-white rounded text-[8px] font-black transition-all">
+                        DELETE
+                    </button>
+                `;
+
                 div.innerHTML = `
                     <div class="flex justify-between items-center mb-1.5">
-                        <span class="font-black text-[11px] text-on-surface tracking-tighter">${formatWIB(t.event_time).split(' ')[1]}</span>
-                        <span class="px-2 py-0.5 rounded text-white text-[9px] uppercase font-black shadow-sm group-hover:scale-105 transition-transform" style="background: ${color}">${t.event_type}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-black text-[11px] text-on-surface tracking-tighter">${formatWIB(t.event_time).split(' ')[1]}</span>
+                            <span class="px-2 py-0.5 rounded text-white text-[9px] uppercase font-black shadow-sm group-hover:scale-105 transition-transform" style="background: ${color}">${t.event_type}</span>
+                        </div>
+                        ${deleteBtn}
                     </div>
                     <div class="text-[9px] text-outline line-clamp-1 font-medium italic group-hover:text-on-surface">
                         ${t.notes || 'No forensic notes recorded...'}
