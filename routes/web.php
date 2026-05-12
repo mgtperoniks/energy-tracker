@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/audit/{log}/ignore', [\App\Http\Controllers\AuditController::class, 'ignore'])->name('audit.ignore');
         Route::post('/audit/{log}/reopen', [\App\Http\Controllers\AuditController::class, 'reopen'])->name('audit.reopen');
         Route::get('/audit/export', [\App\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
+        Route::get('/tagging-audit', [\App\Http\Controllers\TaggingAuditController::class, 'index'])->name('tagging-audit');
     });
 
     // 4. ASSETS
@@ -77,6 +78,16 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/api/charts/device', [\App\Http\Controllers\Api\ChartController::class, 'getDeviceChart'])->name('api.charts.device');
     Route::get('/api/charts/facility', [\App\Http\Controllers\Api\ChartController::class, 'getFacilityChart'])->name('api.charts.facility');
+
+    // 7. TAGGING SYSTEM (Forensic Historian)
+    Route::prefix('api')->group(function () {
+        Route::get('/machines/{id}/tags', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'index']);
+        Route::get('/machines/{id}/tags/export', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'export'])->name('tags.export');
+        Route::post('/machines/{id}/tags', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'store']);
+        Route::put('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'update']);
+        Route::delete('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'destroy']);
+        Route::get('/machines/{id}/phases', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'phases']);
+    });
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

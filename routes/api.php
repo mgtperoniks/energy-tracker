@@ -25,12 +25,7 @@ Route::prefix('machines')->group(function () {
     // GET    /api/machines/{id}/resets → view reset history
     Route::post('/{id}/reset',  [MeterResetController::class, 'store']);
     Route::get('/{id}/resets',  [MeterResetController::class, 'index']);
-    // Operational Event Tags
-    Route::get('/{id}/tags', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'index']);
-    Route::post('/{id}/tags', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'store']);
-    Route::put('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'update']);
-    Route::delete('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'destroy']);
-    Route::get('/{id}/phases', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'phases']);
+    // ... tagging routes moved to web.php
 });
 
 Route::prefix('reports')->group(function () {

@@ -261,7 +261,9 @@
                     </div>
                 </div>
                 <div class="px-4 py-3 bg-surface-container-low/50 border-t border-surface-container flex gap-2 justify-end">
-                    <button id="btn-delete-tag" class="hidden px-4 py-2 bg-error-container text-error font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Delete</button>
+                    @if(auth()->user()->role === 'admin')
+                        <button id="btn-delete-tag" class="hidden px-4 py-2 bg-error-container text-error font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Forensic Delete</button>
+                    @endif
                     <button onclick="saveTag()" class="px-4 py-2 bg-primary text-white font-black rounded text-[9px] uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">Save Tag</button>
                 </div>
             </div>
@@ -482,8 +484,21 @@
         const ctx = document.getElementById('powerChart').getContext('2d');
         let chartInstance = null;
         let baseAnnotations = {};
-        let currentHours = 12;
+        let currentHours = 12; // CACHE RANGE
+        let visualHours = 4;   // VISUAL WINDOW (Objective 1)
         let currentMetric = 'power';
+        let cachedData = [];
+        let visualRange = { min: null, max: null };
+
+        // Patch 1: Global listeners to prevent memory leaks
+        let panMouseDownHandler = null;
+        let panMouseMoveHandler = null;
+        let panMouseUpHandler = null;
+
+        // Patch 5: Centralized Readonly Governance
+        const allowedEmails = ['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'];
+        const currentUserEmail = '{{ auth()->user()->email }}';
+        const isReadonly = !allowedEmails.includes(currentUserEmail);
         
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         if (!deviceId) {
@@ -625,8 +640,14 @@
 
             return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(response => {
-                    const data = response.data || [];
-                    renderChart(data);
+                    cachedData = response.data || [];
+                    
+                    // Set default visual window to latest 4 hours (Objective 1)
+                    const visualEnd = end.getTime();
+                    const visualStart = visualEnd - (visualHours * 60 * 60 * 1000);
+                    visualRange = { min: visualStart, max: visualEnd };
+                    
+                    renderChart(cachedData);
                 })
                 .catch(err => {
                     console.error('Error fetching chart data:', err);
@@ -826,6 +847,7 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
+                    animation: false, // Objective 1: Stable rendering
                     plugins: {
                         legend: { 
                             display: (currentMetric === 'power'),
@@ -838,7 +860,6 @@
                             titleFont: { size: 10 }, bodyFont: { size: 11 },
                             callbacks: { 
                                 title: function(context) {
-                                    const d = new Date(context[0].label);
                                     return formatWIB(context[0].label).substring(5, 16);
                                 },
                                 label: function(context) {
@@ -854,9 +875,10 @@
                             }
                         },
                         annotation: {
-                            annotations: window.structuredClone 
-                                ? structuredClone(baseAnnotations) 
-                                : JSON.parse(JSON.stringify(baseAnnotations))
+                            // Patch 2: Safe deep clone fallback
+                            annotations: window.structuredClone
+                                ? structuredClone(baseAnnotations || {})
+                                : JSON.parse(JSON.stringify(baseAnnotations || {}))
                         }
                     },
                     scales: {
@@ -881,6 +903,8 @@
                         },
                         x: { 
                             type: 'time',
+                            min: visualRange.min, // Objective 1: Sliding Window
+                            max: visualRange.max,
                             time: {
                                 tooltipFormat: 'dd/MM HH:mm',
                                 displayFormats: {
@@ -908,6 +932,65 @@
                     }
                 }
             });
+
+            // PATCH 1: Reusable Named Pan Handlers (Prevent Memory Leaks)
+            if (panMouseDownHandler) ctx.canvas.removeEventListener('mousedown', panMouseDownHandler);
+            if (panMouseMoveHandler) window.removeEventListener('mousemove', panMouseMoveHandler);
+            if (panMouseUpHandler) window.removeEventListener('mouseup', panMouseUpHandler);
+
+            let isPanning = false;
+            let startX = 0;
+            let startMin = 0;
+            let startMax = 0;
+
+            panMouseDownHandler = function(e) {
+                if (e.button !== 0) return; 
+                if (!cachedData || !cachedData.length) return;
+
+                isPanning = true;
+                startX = e.clientX;
+                startMin = chartInstance.options.scales.x.min;
+                startMax = chartInstance.options.scales.x.max;
+                ctx.canvas.style.cursor = 'grabbing';
+            };
+
+            panMouseMoveHandler = function(e) {
+                if (!isPanning) return;
+                if (!cachedData || !cachedData.length) return;
+
+                const dx = e.clientX - startX;
+                const pixelPerMs = (startMax - startMin) / chartInstance.width;
+                const shiftMs = dx * pixelPerMs * -1; 
+                
+                let newMin = startMin + shiftMs;
+                let newMax = startMax + shiftMs;
+
+                const cacheMin = new Date(cachedData[0].timestamp).getTime();
+                const cacheMax = new Date(cachedData[cachedData.length - 1].timestamp).getTime();
+
+                if (newMin < cacheMin) { newMin = cacheMin; newMax = newMin + (visualHours * 60 * 60 * 1000); }
+                if (newMax > cacheMax) { newMax = cacheMax; newMin = newMax - (visualHours * 60 * 60 * 1000); }
+
+                visualRange = { min: newMin, max: newMax };
+                chartInstance.options.scales.x.min = newMin;
+                chartInstance.options.scales.x.max = newMax;
+                chartInstance.update('none'); 
+            };
+
+            panMouseUpHandler = function() {
+                if (isPanning) {
+                    isPanning = false;
+                    ctx.canvas.style.cursor = 'default';
+                }
+            };
+
+            ctx.canvas.addEventListener('mousedown', panMouseDownHandler);
+            window.addEventListener('mousemove', panMouseMoveHandler);
+            window.addEventListener('mouseup', panMouseUpHandler);
+
+            // Re-draw tags after chart creation
+            if (currentTags.length > 0) drawTagAnnotations(currentTags);
+
         } catch (error) {
             console.error('Fatal Chart.js Error:', error);
             renderEmptyChart();
@@ -1148,22 +1231,40 @@
         let currentTags = [];
         
         window.openTagModal = function(timestamp, tagData = null) {
+            // Patch 5: UI Hardening for Readonly Users
+            if (isReadonly) {
+                document.getElementById('tag-event-type').disabled = true;
+                document.getElementById('tag-shift').disabled = true;
+                document.getElementById('tag-notes').disabled = true;
+                document.getElementById('btn-save-tag').classList.add('hidden');
+                
+                // Show Readonly Badge
+                const titleEl = document.getElementById('tag-modal-title');
+                titleEl.innerHTML = (tagData ? 'View Tag' : 'Create Tag') + ' <span class="ml-2 px-2 py-0.5 bg-surface-container text-outline rounded text-[8px] uppercase tracking-widest">READONLY</span>';
+            }
+
             document.getElementById('tag-timestamp').value = formatWIB(timestamp);
             if (tagData) {
                 document.getElementById('tag-id').value = tagData.id;
                 document.getElementById('tag-event-type').value = tagData.event_type;
                 document.getElementById('tag-shift').value = tagData.shift || '1';
                 document.getElementById('tag-notes').value = tagData.notes || '';
-                document.getElementById('tag-modal-title').innerText = 'Edit Operational Tag';
-                document.getElementById('btn-delete-tag').classList.remove('hidden');
-                document.getElementById('btn-delete-tag').onclick = () => deleteTag(tagData.id);
+                if (!isReadonly) document.getElementById('tag-modal-title').innerText = 'Edit Operational Tag';
+                
+                const deleteBtn = document.getElementById('btn-delete-tag');
+                if (deleteBtn && !isReadonly) {
+                    deleteBtn.classList.remove('hidden');
+                    deleteBtn.onclick = function() { deleteTag(tagData.id); };
+                }
             } else {
                 document.getElementById('tag-id').value = '';
                 document.getElementById('tag-event-type').value = 'start';
                 document.getElementById('tag-shift').value = '1';
                 document.getElementById('tag-notes').value = '';
-                document.getElementById('tag-modal-title').innerText = 'Create Operational Tag';
-                document.getElementById('btn-delete-tag').classList.add('hidden');
+                if (!isReadonly) document.getElementById('tag-modal-title').innerText = 'Create Operational Tag';
+                
+                const deleteBtn = document.getElementById('btn-delete-tag');
+                if (deleteBtn) deleteBtn.classList.add('hidden');
             }
             tagModal.classList.remove('hidden');
         };
@@ -1190,11 +1291,6 @@
                 const method = id ? 'PUT' : 'POST';
                 const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
                 
-                // Wrap safeFetch but we need to handle 422 validations inside the safeFetch logic
-                // Wait, safeFetch throws an error if response.ok is false! We need the JSON body.
-                // It's better to just use raw fetch here for validation handling or adjust safeFetch.
-                // Since safeFetch throws on !response.ok, and we need `result.status === 'VALID_WITH_WARNING'`,
-                // let's just use raw fetch for saveTag because we need specific 422 JSON handling.
                 const response = await fetch(url, {
                     method: method,
                     headers: { 
@@ -1242,20 +1338,34 @@
         };
 
         window.deleteTag = async function(id) {
-            if (!confirm('Are you sure you want to delete this tag?')) return;
+            // Patch 4: Delete Must Require Explicit Reason (Frontend)
+            const reason = prompt('INDUSTRIAL GOVERNANCE: Please state forensic reason for deleting this tag (Minimum 10 characters):');
+            if (!reason || reason.length < 10) {
+                alert('Action Aborted: A valid forensic reason (min 10 chars) is mandatory.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to SOFT DELETE this tag? It will be preserved in audit logs.')) return;
             try {
                 const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
                 const response = await fetch(`/api/tags/${id}`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': csrfToken }
+                    headers: { 
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason: reason })
                 });
                 if (response.ok) {
                     closeTagModal();
                     await window.refreshTags();
                     await window.refreshPhases();
+                } else {
+                    const err = await response.json();
+                    alert(err.message || 'Error deleting tag');
                 }
-            } catch (e) {
-                alert('Error deleting tag.');
+            } catch (error) {
+                console.error('Delete tag failed:', error);
             }
         };
 
@@ -1291,20 +1401,30 @@
 
             tags.forEach(t => {
                 const div = document.createElement('div');
-                div.className = 'p-2 rounded border border-surface-container bg-white shadow-sm hover:bg-surface-container-lowest cursor-pointer transition-colors';
+                div.className = 'p-2 rounded border border-surface-container bg-white shadow-sm hover:bg-surface-container-lowest cursor-pointer transition-colors relative overflow-hidden';
                 div.onclick = () => openTagModal(t.event_time, t);
                 
                 const timeStr = formatWIB(t.event_time).split(' ')[1];
-                const editedBadge = t.edited_at ? `<span class="px-1 py-0.5 ml-1 bg-surface-container-high text-[8px] rounded" title="Edited at ${formatWIB(t.edited_at)}">Edited</span>` : '';
+                
+                // Objective 8: Timeline Revision Badges
+                let statusBadge = '';
+                if (t.deleted_at) {
+                    statusBadge = `<span class="px-1 py-0.5 ml-1 bg-error-container text-error text-[7px] font-black rounded uppercase">DELETED</span>`;
+                } else if (t.edited_at) {
+                    statusBadge = `<span class="px-1 py-0.5 ml-1 bg-secondary-container text-on-secondary-container text-[7px] font-black rounded uppercase">EDITED</span>`;
+                }
                 
                 div.innerHTML = `
                     <div class="flex justify-between items-center mb-1">
                         <span class="font-bold text-on-surface">${timeStr}</span>
-                        <span class="px-1.5 py-0.5 rounded text-white text-[8px] uppercase tracking-widest shadow-sm" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
+                        <div class="flex items-center gap-1">
+                            ${statusBadge}
+                            <span class="px-1.5 py-0.5 rounded text-white text-[8px] uppercase tracking-widest shadow-sm" style="background: ${getEventColor(t.event_type)}">${t.event_type}</span>
+                        </div>
                     </div>
                     <div class="flex justify-between items-center text-outline text-[8px]">
                         <span class="truncate pr-1">By: ${t.tagger ? t.tagger.name : 'System'}</span>
-                        ${editedBadge}
+                        <span class="text-[7px] opacity-60">${t.shift ? 'S' + t.shift : ''}</span>
                     </div>
                 `;
                 container.appendChild(div);
@@ -1346,11 +1466,15 @@
         function drawTagAnnotations(tags) {
             if (!chartInstance) return;
             
-            const currentAnnotations = window.structuredClone 
-                ? structuredClone(baseAnnotations || {}) 
+            // Patch 2: Safe deep clone
+            const currentAnnotations = window.structuredClone
+                ? structuredClone(baseAnnotations || {})
                 : JSON.parse(JSON.stringify(baseAnnotations || {}));
             
-            tags.forEach(t => {
+            tags.forEach(function(t) {
+                // Filter out deleted tags from chart (Objective 6)
+                if (t.deleted_at) return;
+
                 currentAnnotations[`tag_${t.id}`] = {
                     type: 'line',
                     xMin: t.event_time,
@@ -1364,7 +1488,9 @@
                         position: 'start',
                         backgroundColor: getEventColor(t.event_type),
                         color: '#fff',
-                        font: { size: 9, weight: 'bold' }
+                        font: { size: 9, weight: 'bold' },
+                        padding: 4,
+                        z: 10
                     },
                     enter(ctx, event) {
                         ctx.chart.canvas.style.cursor = 'pointer';
@@ -1379,7 +1505,7 @@
             });
 
             chartInstance.options.plugins.annotation.annotations = currentAnnotations;
-            chartInstance.update();
+            chartInstance.update('none'); // Update without animation for pan stability
         }
 
         function renderPhases(phases) {
@@ -1408,7 +1534,7 @@
                         <td class="px-4 py-2 font-mono text-outline">${formatWIB(p.end_time).split(' ')[1]}</td>
                         <td class="px-4 py-2 text-center">${statusHtml}</td>
                         <td class="px-4 py-2 font-black uppercase text-primary">${p.phase_name}</td>
-                        <td class="px-4 py-2 text-right font-black">${p.duration_minutes}m</td>
+                        <td class="px-4 py-2 text-right font-black">${p.duration_human}</td>
                         <td class="px-4 py-2 text-right text-outline">${p.avg_kw}</td>
                         <td class="px-4 py-2 text-right text-outline">${p.peak_kw}</td>
                         <td class="px-4 py-2 text-right font-black text-on-surface">${p.usage_kwh}</td>

@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OperationalEventTag extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
-    protected $guarded = [];
+    protected $guarded = ['id'];
 
     protected $casts = [
         'event_time' => 'datetime',
         'edited_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function device()
@@ -29,5 +30,10 @@ class OperationalEventTag extends Model
     public function editor()
     {
         return $this->belongsTo(User::class, 'edited_by');
+    }
+
+    public function deleter()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }

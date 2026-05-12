@@ -226,7 +226,10 @@
                     Accounting Report
                 </a>
                 <a href="{{ route('analytics.audit') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
-                    Audit Trail
+                    System Audit Trail
+                </a>
+                <a href="{{ route('analytics.tagging-audit') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.tagging-audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                    Tagging Audit Logs
                 </a>
             </div>
         </details>

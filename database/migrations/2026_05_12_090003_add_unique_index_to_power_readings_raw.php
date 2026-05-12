@@ -11,17 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('power_readings_raw', function (Blueprint $table) {
-            // Drop non-unique index if it exists (added in previous turn)
-            try {
-                $table->dropIndex(['recorded_at', 'telemetry_quality']);
-            } catch (\Exception $e) {}
+        // Patch 2 & 3: Raw SQL Index Detection (Portability)
+        $indexes = collect(DB::select("SHOW INDEX FROM power_readings_raw"))->pluck('Key_name')->unique();
 
-            // Ensure unique historian entries (device_id + recorded_at)
-            $table->unique(['device_id', 'recorded_at'], 'unique_device_timestamp');
+        Schema::table('power_readings_raw', function (Blueprint $table) use ($indexes) {
+            if (!$indexes->contains('unique_device_timestamp') && !$indexes->contains('uidx_device_timestamp')) {
+                 $table->unique(['device_id', 'recorded_at'], 'unique_device_timestamp');
+            }
             
-            // Re-add helper index for quality analytics
-            $table->index(['recorded_at', 'telemetry_quality']);
+            if (!$indexes->contains('power_readings_raw_recorded_at_telemetry_quality_index')) {
+                $table->index(['recorded_at', 'telemetry_quality']);
+            }
         });
     }
 
