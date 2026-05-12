@@ -386,6 +386,16 @@
 <script src="{{ asset('assets/vendor/date-fns/date-fns.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/chartjs-adapter-date-fns/chartjs-adapter-date-fns.bundle.min.js') }}"></script>
 <script>
+    // Patch: Global Crash Detector
+    window.onerror = function(msg, src, line, col, err) {
+        console.error('GLOBAL JS CRASH:', msg, 'LINE:', line, 'COL:', col);
+        const statusEl = document.getElementById('health-status');
+        if (statusEl) {
+            statusEl.textContent = 'JS CRASH';
+            statusEl.className = 'font-black text-error';
+        }
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('powerChart').getContext('2d');
         const phaseSection = document.getElementById('phase-reconstruction-section');
@@ -644,21 +654,23 @@
                             min: 0
                         }
                     }
-                }
-            });
+                });
 
-            console.log('Industrial Recovery: Chart rendered with ' + labels.length + ' points.');
+                console.log('Industrial Recovery: Chart rendered with ' + labels.length + ' points.');
 
-            // Patch 5 & 6: Safe Click Tagging
-            ctx.canvas.onclick = function(e) {
-                if (isReadonly || currentHours !== 4) return;
-                const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-                if (points.length) {
-                    const firstPoint = points[0];
-                    const label = decimatedData[firstPoint.index].timestamp;
-                    openTagModal(label);
-                }
-            };
+                // Patch 5 & 6: Safe Click Tagging
+                ctx.canvas.onclick = function(e) {
+                    if (isReadonly || currentHours !== 4) return;
+                    const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+                    if (points.length) {
+                        const firstPoint = points[0];
+                        const label = decimatedData[firstPoint.index].timestamp;
+                        openTagModal(label);
+                    }
+                };
+            } catch (err) {
+                console.error('renderChart failed', err);
+            }
         }
 
         // --- TAGGING & PHASES ---
@@ -972,6 +984,9 @@
                 .catch(function(err) {
                     console.error('Telemetry Load Error:', err);
                 });
+            } catch (err) {
+                console.error('loadTelemetry Crash:', err);
+            }
         }
 
         function initDashboard() {
