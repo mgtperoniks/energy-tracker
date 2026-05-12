@@ -662,8 +662,8 @@
                         ctx.fillStyle = getPhaseOverlayColor(p.phase.toLowerCase());
                         ctx.fillRect(xDrawStart, chartArea.top, drawWidth, chartArea.bottom - chartArea.top);
 
-                        // Draw Adaptive Labels (Density Patch)
-                        if (width > 28) {
+                        // Draw Adaptive Labels (Visibility Tuning Patch)
+                        if (width > 18) {
                             const shortNames = {
                                 melting: 'MELT',
                                 pour: 'POUR',
@@ -677,21 +677,49 @@
                             const safeCenterX = Math.max(chartArea.left + 10, Math.min(centerX, chartArea.right - 10));
                             
                             ctx.save();
-                            ctx.fillStyle = 'rgba(0,0,0,0.55)';
                             ctx.textAlign = 'center';
 
                             if (width > 120) {
                                 ctx.font = 'bold 10px Inter, sans-serif';
-                                ctx.fillText(p.phase_name.toUpperCase(), safeCenterX, chartArea.top + 20);
-                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 34);
+                                // Backplates
+                                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                                ctx.fillRect(safeCenterX - 22, chartArea.top + 24, 44, 12);
+                                ctx.fillRect(safeCenterX - 18, chartArea.top + 38, 36, 12);
+
+                                ctx.fillStyle = 'rgba(0,0,0,0.72)';
+                                ctx.fillText(p.phase_name.toUpperCase(), safeCenterX, chartArea.top + 34);
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 48);
                             } else if (width > 60) {
                                 ctx.font = 'bold 9px Inter, sans-serif';
                                 const shortLabel = shortNames[p.phase.toLowerCase()] || p.phase_name.toUpperCase();
-                                ctx.fillText(shortLabel, safeCenterX, chartArea.top + 18);
-                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 30);
-                            } else {
+                                // Backplates
+                                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                                ctx.fillRect(safeCenterX - 18, chartArea.top + 26, 36, 12);
+                                ctx.fillRect(safeCenterX - 18, chartArea.top + 38, 36, 12);
+
+                                ctx.fillStyle = 'rgba(0,0,0,0.72)';
+                                ctx.fillText(shortLabel, safeCenterX, chartArea.top + 36);
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 48);
+                            } else if (width > 40) {
                                 ctx.font = 'bold 8px Inter, sans-serif';
-                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 22);
+                                // Backplate
+                                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                                ctx.fillRect(safeCenterX - 16, chartArea.top + 30, 32, 14);
+
+                                ctx.fillStyle = 'rgba(0,0,0,0.72)';
+                                ctx.fillText(p.duration_human, safeCenterX, chartArea.top + 40);
+                            } else {
+                                // TINY DURATION STACK MODE (18px to 40px)
+                                ctx.font = 'bold 7px Inter, sans-serif';
+                                const duration = p.duration_human.replace('m', '');
+                                const yBase = chartArea.top + 38;
+
+                                ctx.fillStyle = 'rgba(255,255,255,0.65)';
+                                ctx.fillRect(safeCenterX - 8, yBase - 10, 16, 18);
+
+                                ctx.fillStyle = 'rgba(0,0,0,0.70)';
+                                ctx.fillText(duration, safeCenterX, yBase);
+                                ctx.fillText('m', safeCenterX, yBase + 8);
                             }
                             ctx.restore();
                         }
@@ -752,11 +780,11 @@
                                 {
                                     label: 'Voltage (V)',
                                     data: voltageData,
-                                    borderColor: '#f97316', // Orange
+                                    borderColor: 'rgba(249,115,22,0.75)', // Reduced dominance
                                     backgroundColor: 'transparent',
                                     fill: false,
                                     pointRadius: 0,
-                                    borderWidth: 1.5,
+                                    borderWidth: 1,
                                     tension: 0.1,
                                     spanGaps: true,
                                     yAxisID: 'y1'
