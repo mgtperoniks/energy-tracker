@@ -166,12 +166,18 @@
                         <button onclick="updateRange(168)" id="btn-7d" class="px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white hover:shadow-sm text-outline">7D</button>
                     </div>
                     
-                    <!-- Forensic Date/Time Filter -->
+                    <!-- Forensic Date/Time Filter (Restored Professional UI) -->
                     <div class="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-surface-container ml-2">
-                        <input type="date" id="forensic-date" class="bg-transparent text-[10px] font-bold text-on-surface outline-none px-2 py-1 cursor-pointer">
-                        <input type="time" id="forensic-time" class="bg-transparent text-[10px] font-bold text-on-surface outline-none px-2 py-1 cursor-pointer border-l border-surface-container">
-                        <button onclick="applyForensicDateTime()" class="ml-1 p-1 bg-primary text-white rounded hover:brightness-110 transition-all">
-                            <span class="material-symbols-outlined text-sm">search</span>
+                        <div class="flex flex-col px-1">
+                            <label class="text-[7px] font-black uppercase text-outline">Start Datetime</label>
+                            <input type="datetime-local" id="forensic-start" class="bg-transparent text-[9px] font-bold text-on-surface outline-none">
+                        </div>
+                        <div class="flex flex-col px-1 border-l border-surface-container">
+                            <label class="text-[7px] font-black uppercase text-outline">End Datetime</label>
+                            <input type="datetime-local" id="forensic-end" class="bg-transparent text-[9px] font-bold text-on-surface outline-none">
+                        </div>
+                        <button onclick="applyForensicRange()" class="ml-1 px-3 py-2 bg-primary text-white rounded hover:brightness-110 transition-all flex items-center justify-center">
+                            <span class="text-[8px] font-black uppercase">Generate</span>
                         </button>
                     </div>
                 </div>
@@ -487,39 +493,55 @@
             initDashboard();
         };
 
-        window.applyForensicDateTime = function() {
-            const date = document.getElementById('forensic-date').value;
-            const time = document.getElementById('forensic-time').value;
-            if (!date || !time) return alert('Please select both Date and Time.');
+        window.applyForensicRange = function() {
+            const startVal = document.getElementById('forensic-start').value;
+            const endVal = document.getElementById('forensic-end').value;
+            if (!startVal || !endVal) return alert('Please select both Start and End datetimes.');
             
-            const target = new Date(date + 'T' + time);
-            const fetchStart = new Date(target.getTime() - (9 * 60 * 60 * 1000));
-            const fetchEnd = new Date(target.getTime() + (9 * 60 * 60 * 1000));
+            const start = new Date(startVal);
+            const end = new Date(endVal);
             
-            // Trigger load with specific range
-            currentHours = 4;
-            updateRange(4); // Ensure mode UI is correct
+            if (end <= start) return alert('End time must be after Start time.');
+            
+            // Limit to 24H for performance safety
+            if ((end - start) > (24 * 60 * 60 * 1000)) {
+                if (!confirm('Range exceeds 24H. This may affect terminal performance. Continue?')) return;
+            }
 
-            safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${fetchStart.toISOString()}&end_date=${fetchEnd.toISOString()}`)
+            safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(function(response) {
                     cachedData = response.data || [];
-                    const vTarget = target.getTime();
-                    visualRange = { min: vTarget - (2 * 60 * 60 * 1000), max: vTarget + (2 * 60 * 60 * 1000) };
+                    visualRange = { min: start.getTime(), max: end.getTime() };
+                    
+                    // If range > 4H, disable forensic arrows to prevent confusion
+                    currentHours = (end - start) / (60 * 60 * 1000);
+                    updateRangeUI(currentHours);
+                    
                     renderChart(cachedData);
                     loadTags();
                     loadPhases();
                 })
                 .catch(function(err) {
-                    console.error('DateTime Jump Failed:', err);
-                    updateHealthPanel('status', 'JUMP ERROR', 'text-error');
+                    console.error('Forensic Range Failed:', err);
+                    updateHealthPanel('status', 'FETCH FAIL', 'text-error');
                 });
         };
+
+        function updateRangeUI(h) {
+            ['1h', '4h', '12h', '24h', '7d'].forEach(function(id) {
+                const btn = document.getElementById('btn-' + id);
+                if (btn) btn.classList.remove('bg-white', 'shadow-sm', 'text-primary');
+            });
+            const key = h === 168 ? '7d' : h + 'h';
+            const activeBtn = document.getElementById('btn-' + key);
+            if (activeBtn) activeBtn.classList.add('bg-white', 'shadow-sm', 'text-primary');
+        }
 
         window.shiftForensic = function(direction) {
             if (currentHours !== 4 || !cachedData.length || forensicBusy) return;
             
-            forensicBusy = true; // Patch 5: Lock interaction
-            setTimeout(function() { forensicBusy = false; }, 500); // 500ms Debounce
+            forensicBusy = true;
+            setTimeout(function() { forensicBusy = false; }, 500);
             
             const shiftMs = direction * (60 * 60 * 1000); // 1 hour shift
             const newMin = visualRange.min + shiftMs;
@@ -536,11 +558,8 @@
             visualRange.min = newMin;
             visualRange.max = newMax;
             
-            if (chartInstance) {
-                chartInstance.options.scales.x.min = newMin;
-                chartInstance.options.scales.x.max = newMax;
-                chartInstance.update('none');
-            }
+            // Re-render chart to update filtered category labels
+            renderChart(cachedData);
         };
 
         function loadChartData() {
@@ -577,23 +596,26 @@
         // Patch 9: Chart decimation (Max 3000 points)
         function renderChart(data) {
             try {
-                // Patch 9: Proper Memory Cleanup
                 if (chartInstance) {
                     chartInstance.options.plugins.annotation.annotations = {};
                     chartInstance.destroy();
                     chartInstance = null;
                 }
             
-            // console.log('renderChart input:', data.length);
+            // Patch 1: Filter data to visualRange for Category Scale Precision
+            const filteredData = data.filter(function(item) {
+                const ts = new Date(item.timestamp).getTime();
+                return ts >= visualRange.min && ts <= visualRange.max;
+            });
             
             // Decimation logic: step = ceil(total / 3000)
             const maxPoints = 3000;
-            const step = Math.max(1, Math.ceil(data.length / maxPoints));
-            const decimatedData = (step === 1) ? data : data.filter((_, i) => i % step === 0);
+            const step = Math.max(1, Math.ceil(filteredData.length / maxPoints));
+            const decimatedData = (step === 1) ? filteredData : filteredData.filter((_, i) => i % step === 0);
 
-            // Patch 4: Temporary Label Test (Category Scale)
+            // Category Scale: Labels MUST match data points
             const labels = decimatedData.map(function(item) {
-                return formatWIB(item.timestamp).split(' ')[1]; // Show only time
+                return formatWIB(item.timestamp).split(' ')[1]; // Time only
             });
             const powerData = decimatedData.map(item => item.power_kw);
             const voltageData = decimatedData.map(item => item.voltage);
