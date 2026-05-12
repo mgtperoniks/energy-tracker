@@ -397,7 +397,14 @@
     };
 
     document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('powerChart').getContext('2d');
+        const canvasEl = document.getElementById('powerChart');
+        if (!canvasEl) { console.error('Canvas not found'); return; }
+        const ctx = canvasEl.getContext('2d');
+        if (!ctx) { console.error('Canvas context failed'); return; }
+
+        console.log('Historian Init - CTX:', ctx);
+        console.log('Historian Init - Chart exists:', typeof Chart);
+        // console.log('Historian Init - dateFns exists:', typeof dateFns);
         const phaseSection = document.getElementById('phase-reconstruction-section');
         const phaseTableBody = document.getElementById('phase-tbody');
         const tagModal = document.getElementById('tag-modal');
@@ -544,6 +551,7 @@
 
                 return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                     .then(function(response) {
+                        // console.log('Chart API Response:', response);
                         cachedData = response.data || [];
                         updateHealthPanel('telemetry', cachedData.length);
                         updateHealthPanel('forensic', currentHours === 4 ? 'ACTIVE' : 'OFF');
@@ -576,98 +584,116 @@
                     chartInstance = null;
                 }
             
+            // console.log('renderChart input:', data.length);
+            
             // Decimation logic: step = ceil(total / 3000)
             const maxPoints = 3000;
             const step = Math.max(1, Math.ceil(data.length / maxPoints));
             const decimatedData = (step === 1) ? data : data.filter((_, i) => i % step === 0);
 
-            const labels = decimatedData.map(item => item.timestamp);
+            // Patch 4: Temporary Label Test (Category Scale)
+            const labels = decimatedData.map(function(item) {
+                return formatWIB(item.timestamp).split(' ')[1]; // Show only time
+            });
             const powerData = decimatedData.map(item => item.power_kw);
             const voltageData = decimatedData.map(item => item.voltage);
             
             // Patch 9: Handler cleanup before destruction
-            ctx.canvas.onclick = null;
+            if (canvasEl) canvasEl.onclick = null;
             
-            chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Active Power (kW)',
-                            data: powerData,
-                            borderColor: '#00628c',
-                            backgroundColor: 'rgba(0, 98, 140, 0.05)',
-                            fill: true,
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1,
-                            spanGaps: true,
-                            yAxisID: 'y'
+                // Patch 5: Harden Chart Constructor
+                try {
+                    chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Active Power (kW)',
+                                    data: powerData,
+                                    borderColor: '#00628c',
+                                    backgroundColor: 'rgba(0, 98, 140, 0.05)',
+                                    fill: true,
+                                    pointRadius: 0,
+                                    borderWidth: 2,
+                                    tension: 0.1,
+                                    spanGaps: true,
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: 'Voltage (V)',
+                                    data: voltageData,
+                                    borderColor: '#f97316', // Orange
+                                    backgroundColor: 'transparent',
+                                    fill: false,
+                                    pointRadius: 0,
+                                    borderWidth: 1.5,
+                                    tension: 0.1,
+                                    spanGaps: true,
+                                    yAxisID: 'y1'
+                                }
+                            ]
                         },
-                        {
-                            label: 'Voltage (V)',
-                            data: voltageData,
-                            borderColor: '#f97316', // Orange
-                            backgroundColor: 'transparent',
-                            fill: false,
-                            pointRadius: 0,
-                            borderWidth: 1.5,
-                            tension: 0.1,
-                            spanGaps: true,
-                            yAxisID: 'y1'
+                        options: {
+                            responsive: true, 
+                            maintainAspectRatio: false,
+                            animation: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { enabled: true },
+                                annotation: { annotations: {} },
+                                decimation: { enabled: false }
+                            },
+                            scales: {
+                                x: { 
+                                    type: 'category', // Patch 3: Temporary Diagnostic (Windows 7 Compatibility)
+                                    grid: { display: false },
+                                    ticks: {
+                                        maxRotation: 0,
+                                        autoSkip: true,
+                                        maxTicksLimit: 10
+                                    }
+                                },
+                                y: { 
+                                    title: { display: true, text: 'Power (kW)', font: { size: 10, weight: 'bold' } },
+                                    min: 0, 
+                                    grid: { color: 'rgba(0,0,0,0.05)' } 
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: { display: true, text: 'Voltage (V)', font: { size: 10, weight: 'bold' } },
+                                    grid: { drawOnChartArea: false },
+                                    min: 0
+                                }
+                            }
                         }
-                    ]
-                },
-                options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    animation: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { enabled: true },
-                        annotation: { annotations: {} },
-                        decimation: { enabled: false }
-                    },
-                    scales: {
-                        x: { 
-                            type: 'time', 
-                            min: visualRange.min, 
-                            max: visualRange.max,
-                            grid: { display: false }
-                        },
-                        y: { 
-                            title: { display: true, text: 'Power (kW)', font: { size: 10, weight: 'bold' } },
-                            min: 0, 
-                            grid: { color: 'rgba(0,0,0,0.05)' } 
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Voltage (V)', font: { size: 10, weight: 'bold' } },
-                            grid: { drawOnChartArea: false },
-                            min: 0
-                        }
-                    }
-                });
+                    });
+                } catch(chartErr) {
+                    console.error('CHART INIT FAILED', chartErr);
+                    updateHealthPanel('status', 'CHART FAIL', 'text-error');
+                    return;
+                }
 
                 console.log('Industrial Recovery: Chart rendered with ' + labels.length + ' points.');
 
-                // Patch 5 & 6: Safe Click Tagging
-                ctx.canvas.onclick = function(e) {
-                    if (isReadonly || currentHours !== 4) return;
-                    const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-                    if (points.length) {
-                        const firstPoint = points[0];
-                        const label = decimatedData[firstPoint.index].timestamp;
-                        openTagModal(label);
-                    }
-                };
+                    // Patch 5 & 6: Safe Click Tagging
+                if (canvasEl) {
+                    canvasEl.onclick = function(e) {
+                        if (isReadonly || currentHours !== 4) return;
+                        const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+                        if (points.length) {
+                            const firstPoint = points[0];
+                            const label = decimatedData[firstPoint.index].timestamp;
+                            openTagModal(label);
+                        }
+                    };
+                }
             } catch (err) {
                 console.error('renderChart failed', err);
             }
