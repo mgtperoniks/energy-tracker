@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\DB;
 use App\Exports\OperationalReportExport;
 use App\Exports\AccountingReportExport;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;class ReportController extends Controller
+use Barryvdh\DomPDF\Facade\Pdf;
+
+class ReportController extends Controller
 {
 
     public function operational(Request $request)

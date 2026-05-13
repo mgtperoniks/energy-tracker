@@ -239,6 +239,13 @@ class OperationalEventTagController extends Controller
         $start = $request->query('start') ? Carbon::parse($request->query('start'))->setTimezone('Asia/Jakarta') : Carbon::now('Asia/Jakarta')->subHours(12);
         $end = $request->query('end') ? Carbon::parse($request->query('end'))->setTimezone('Asia/Jakarta') : Carbon::now('Asia/Jakarta');
 
+        $phases = $this->getReconstructedPhases($deviceId, $start, $end);
+
+        return response()->json(array_slice($phases, 0, 15));
+    }
+
+    private function getReconstructedPhases($deviceId, $start, $end)
+    {
         $beforeTag = OperationalEventTag::where('device_id', $deviceId)
             ->where('event_time', '<', $start)
             ->orderBy('event_time', 'desc')
@@ -276,11 +283,9 @@ class OperationalEventTagController extends Controller
             $nextTag = ($i < $totalTags - 1) ? $sortedTags[$i + 1] : null;
             $phaseEnd = $nextTag ? $nextTag->event_time : $end;
             
-            // Patch 7: Phase Stability (Capping OPEN phases at filter end)
             if ($phaseEnd->isFuture()) $phaseEnd = Carbon::now('Asia/Jakarta');
             
             $status = $nextTag ? 'CLOSED' : 'OPEN';
-
             $durationMinutes = max(0, $currentTag->event_time->diffInMinutes($phaseEnd));
 
             $metrics = DB::table('power_readings_raw')
@@ -313,8 +318,10 @@ class OperationalEventTagController extends Controller
             $estCost = max(0, $usageKwh * $rate);
 
             $phases[] = [
-                'start_time' => $currentTag->event_time->setTimezone('Asia/Jakarta')->toIso8601String(),
-                'end_time' => $phaseEnd->setTimezone('Asia/Jakarta')->toIso8601String(),
+                'start_time' => $currentTag->event_time->setTimezone('Asia/Jakarta'),
+                'end_time' => $phaseEnd->setTimezone('Asia/Jakarta'),
+                'start_time_iso' => $currentTag->event_time->setTimezone('Asia/Jakarta')->toIso8601String(),
+                'end_time_iso' => $phaseEnd->setTimezone('Asia/Jakarta')->toIso8601String(),
                 'phase' => $currentTag->event_type,
                 'phase_name' => $getHumanReadablePhase($currentTag->event_type),
                 'status' => $status,
@@ -327,7 +334,40 @@ class OperationalEventTagController extends Controller
             ];
         }
 
-        return response()->json(array_slice(array_reverse($phases), 0, 15));
+        return array_reverse($phases);
+    }
+
+    public function exportPhases(Request $request, $deviceId)
+    {
+        $start = $request->query('start') ? Carbon::parse($request->query('start')) : now()->subHours(12);
+        $end = $request->query('end') ? Carbon::parse($request->query('end')) : now();
+        $device = Device::findOrFail($deviceId);
+
+        $phases = $this->getReconstructedPhases($deviceId, $start, $end);
+        $filename = 'operational_phases_' . $device->name . '_' . now()->format('Ymd_Hi') . '.xlsx';
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\OperationalPhasesExport($phases, $device, $start, $end),
+            $filename
+        );
+    }
+
+    public function exportPhasesPdf(Request $request, $deviceId)
+    {
+        $start = $request->query('start') ? Carbon::parse($request->query('start')) : now()->subHours(12);
+        $end = $request->query('end') ? Carbon::parse($request->query('end')) : now();
+        $device = Device::findOrFail($deviceId);
+
+        $phases = $this->getReconstructedPhases($deviceId, $start, $end);
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.operational_phases_pdf', [
+            'phases' => $phases,
+            'device' => $device,
+            'start' => $start,
+            'end' => $end
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream('operational_report_' . $device->name . '_' . now()->format('Ymd_Hi') . '.pdf');
     }
 
     public function export(Request $request, $deviceId)

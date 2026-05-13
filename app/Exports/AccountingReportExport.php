@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -11,18 +11,28 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithEvents
+class AccountingReportExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithEvents
 {
-    protected $query;
+    protected $collection;
+    protected $summary;
 
     public function __construct($query)
     {
-        $this->query = $query;
+        // Fetch and hydrate data once
+        $this->collection = $query->get()->each(function($row) {
+            $row->hydrateLive();
+        });
+
+        // Pre-calculate summary from hydrated collection
+        $this->summary = [
+            'total_kwh' => $this->collection->sum('kwh_usage'),
+            'total_cost' => $this->collection->sum('energy_cost')
+        ];
     }
 
-    public function query()
+    public function collection()
     {
-        return $this->query;
+        return $this->collection;
     }
 
     public function headings(): array
@@ -40,8 +50,6 @@ class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, Sh
 
     public function map($row): array
     {
-        $row->hydrateLive();
-
         $rate = $row->applied_rate;
 
         return [
@@ -69,15 +77,11 @@ class AccountingReportExport implements FromQuery, WithHeadings, WithMapping, Sh
                 $lastRow = $event->sheet->getHighestRow();
                 $footerRow = $lastRow + 1;
 
-                $summaryQuery = clone $this->query;
-                $totalKwh = $summaryQuery->sum('kwh_usage');
-                $totalCost = $summaryQuery->sum('energy_cost');
-
                 $delegate = $event->sheet->getDelegate();
                 $delegate->mergeCells("A{$footerRow}:C{$footerRow}");
                 $delegate->setCellValue("A{$footerRow}", 'GRAND TOTAL');
-                $delegate->setCellValue("D{$footerRow}", round($totalKwh, 2));
-                $delegate->setCellValue("F{$footerRow}", round($totalCost, 0));
+                $delegate->setCellValue("D{$footerRow}", round($this->summary['total_kwh'], 2));
+                $delegate->setCellValue("F{$footerRow}", round($this->summary['total_cost'], 0));
 
                 $delegate->getStyle("A{$footerRow}:F{$footerRow}")->applyFromArray([
                     'font' => ['bold' => true],

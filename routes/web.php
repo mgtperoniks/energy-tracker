@@ -18,7 +18,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('monitoring')->name('monitoring.')->group(function () {
         Route::get('/meters/{id?}', [\App\Http\Controllers\MachineDashboardController::class, 'show'])->name('meters');
         Route::get('/meters/{id}/export', [\App\Http\Controllers\MachineDashboardController::class, 'export'])->name('meters.export');
-        Route::get('/environmental', [\App\Http\Controllers\EnvironmentalController::class, 'index'])->name('environmental');
+        // Placeholder to prevent RouteNotFoundException in navigation
+        Route::get('/environmental', function() { abort(404, 'Environmental Monitoring Module not installed.'); })->name('environmental');
         Route::get('/system-health', [\App\Http\Controllers\SystemHealthController::class, 'index'])->name('health');
     });
 
@@ -87,6 +88,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'update']);
         Route::delete('/tags/{tagId}', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'destroy']);
         Route::get('/machines/{id}/phases', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'phases']);
+        Route::get('/machines/{id}/phases/export', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'exportPhases'])->name('phases.export');
+        Route::get('/machines/{id}/phases/pdf', [\App\Http\Controllers\Api\OperationalEventTagController::class, 'exportPhasesPdf'])->name('phases.pdf');
     });
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
