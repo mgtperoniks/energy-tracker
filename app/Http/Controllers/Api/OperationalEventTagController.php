@@ -360,7 +360,7 @@ class OperationalEventTagController extends Controller
 
         $phases = $this->getReconstructedPhases($deviceId, $start, $end);
         
-        $pdf = \Pdf::loadView('exports.operational_phases_pdf', [
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.operational_phases_pdf', [
             'phases' => $phases,
             'device' => $device,
             'start' => $start,
