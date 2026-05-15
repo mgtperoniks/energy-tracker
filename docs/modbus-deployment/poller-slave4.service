@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/Energy-Tracker
-EnvironmentFile=/opt/Energy-Tracker/.env.slave4
-ExecStart=/usr/bin/python3 /opt/Energy-Tracker/modbus_poller.py
+WorkingDirectory=/srv/docker/apps/energy-tracker
+EnvironmentFile=/srv/docker/apps/energy-tracker/.env.slave4
+ExecStart=/usr/bin/python3 /srv/docker/apps/energy-tracker/modbus_poller.py
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/poller-slave4.log
