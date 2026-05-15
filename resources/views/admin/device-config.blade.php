@@ -57,7 +57,7 @@
                                     <code class="text-[10px] bg-surface-container-high px-2 py-1 rounded text-outline font-mono">
                                         {{ Str::limit($device->api_token, 10, '...') }}
                                     </code>
-                                    <button onclick="copyToClipboard('{{ $device->api_token }}')" class="p-1 hover:bg-primary/10 rounded-md transition-colors text-primary">
+                                    <button onclick="copyToClipboard('{{ $device->api_token }}', this)" class="p-1 hover:bg-primary/10 rounded-md transition-all text-primary flex items-center justify-center min-w-[24px]">
                                         <span class="material-symbols-outlined text-sm">content_copy</span>
                                     </button>
                                 </div>
@@ -169,20 +169,55 @@
         modal.classList.remove('flex');
     }
 
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('API Token copied to clipboard!');
-        }).catch(err => {
-            console.error('Failed to copy: ', err);
-            // Fallback for older browsers
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textArea);
-            alert('API Token copied to clipboard!');
-        });
+    function copyToClipboard(text, btn) {
+        const icon = btn.querySelector('.material-symbols-outlined');
+        const originalIcon = icon.innerText;
+
+        function showSuccess() {
+            icon.innerText = 'check';
+            btn.classList.add('text-green-600', 'bg-green-50');
+            
+            setTimeout(() => {
+                icon.innerText = originalIcon;
+                btn.classList.remove('text-green-600', 'bg-green-50');
+            }, 2000);
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccess();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                fallbackCopy(text, showSuccess);
+            });
+        } else {
+            fallbackCopy(text, showSuccess);
+        }
+    }
+
+    function fallbackCopy(text, callback) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        
+        // Ensure textarea is not visible but part of DOM
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                callback();
+            }
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+        }
+        
+        document.body.removeChild(textArea);
     }
 
     // Close on background click
