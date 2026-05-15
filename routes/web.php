@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('assets')->name('assets.')->group(function () {
         Route::get('/departments', [\App\Http\Controllers\AssetController::class, 'departments'])->name('departments');
         Route::get('/machines', [\App\Http\Controllers\AssetController::class, 'machines'])->name('machines');
+        Route::post('/machines/update', [\App\Http\Controllers\AssetController::class, 'updateMachine'])->name('machines.update');
         Route::get('/devices', [\App\Http\Controllers\AssetController::class, 'devices'])->name('devices');
         Route::get('/sensors', [\App\Http\Controllers\AssetController::class, 'sensors'])->name('sensors');
     });
