@@ -40,10 +40,6 @@
                         class="inline-block w-1.5 h-1.5 rounded-full {{ $statusColor }} @if($opStatus == 'Running') animate-pulse @endif"></span>
                     <span class="text-[9px] uppercase tracking-widest text-outline font-bold">{{ $opStatus }}</span>
                 </div>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <meta name="csrf-token" content="{{ csrf_token() }}">
-                <title>{{ $machine->name }} - Industrial Historian</title>
                 <h1 class="text-xl font-black tracking-tight text-on-surface">{{ $machine->name }}</h1>
                 <p class="text-on-surface-variant text-[10px] mt-0.5">Code: {{ $machine->code }} | Modbus TCP/RS485</p>
             </div>
@@ -533,13 +529,23 @@
         let currentHours = 4; // Default: 4H Forensic Mode
         let currentMetric = 'power';
         let cachedData = [];
-        let visualRange = { min: null, max: null };
+        // Hardened Initialization: Default to last 4H
+        let visualRange = { 
+            min: Date.now() - (4 * 60 * 60 * 1000), 
+            max: Date.now() 
+        };
         let currentTags = [];
         let currentPhases = [];
         let decimatedData = []; // Store for annotation index mapping
         let activeRequests = {}; // Temporarily unused in recovery
         let forensicOffsetHours = 0;
         let forensicBusy = false; // Patch 5: Spam Protection
+
+        // Patch 11: Centralized Timestamp Normalization
+        function getTelemetryTs(item) {
+            if (!item) return null;
+            return item.timestamp || item.recorded_at || item.event_time || item.created_at || null;
+        }
 
         const deviceId = {{ $machine->devices->first() ? $machine->devices->first()->id : 'null' }};
         const isReadonly = !['adminqcflange@peroniks.com', 'adminqcfitting@peroniks.com'].includes('{{ auth()->user()->email }}');
@@ -564,12 +570,16 @@
                         return;
                     }
                     return response.text().then(function (text) {
-                        let msg = 'Backend Error';
+                        let msg = 'Backend Error (' + response.status + ')';
                         try {
-                            const json = JSON.parse(text);
-                            msg = json.message || json.error || msg;
+                            if (text.trim().startsWith('{')) {
+                                const json = JSON.parse(text);
+                                msg = json.message || json.error || msg;
+                            } else {
+                                console.error('Non-JSON Error Response:', text.substring(0, 200));
+                            }
                         } catch (e) {
-                            msg = text.substring(0, 100);
+                            console.error('Error parsing backend response:', e);
                         }
                         throw new Error(msg);
                     });
@@ -636,15 +646,20 @@
             safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                 .then(function (response) {
                     cachedData = response.data || [];
-                    visualRange = { min: start.getTime(), max: end.getTime() };
 
-                    // If range > 4H, disable forensic arrows to prevent confusion
-                    currentHours = (end - start) / (60 * 60 * 1000);
-                    updateRangeUI(currentHours);
+                    // Strict Array Guard
+                    if (!Array.isArray(cachedData)) {
+                        console.error('Telemetry payload is not array', cachedData);
+                        return;
+                    }
 
                     renderChart(cachedData);
-                    loadTags();
-                    loadPhases();
+                    
+                    // Historical Mode Bypass: Use explicit range for tags/phases
+                    const startISO = start.toISOString();
+                    const endISO = end.toISOString();
+                    loadTags(startISO, endISO);
+                    loadPhases(startISO, endISO);
                 })
                 .catch(function (err) {
                     console.error('Forensic Range Failed:', err);
@@ -670,7 +685,12 @@
                 
                 // Invert: Value 14 (Right) = Now (Offset 0), Value 0 (Left) = 18H Ago (Offset 14)
                 forensicOffsetHours = 14 - parseInt(forensicScrubber.value);
-                const cacheEnd = new Date(cachedData[cachedData.length - 1].timestamp).getTime();
+                
+                const lastDataPoint = cachedData[cachedData.length - 1];
+                const lastTs = getTelemetryTs(lastDataPoint);
+                if (!lastTs) return;
+
+                const cacheEnd = new Date(lastTs).getTime();
                 
                 visualRange.max = cacheEnd - (forensicOffsetHours * 60 * 60 * 1000);
                 visualRange.min = visualRange.max - (currentHours * 60 * 60 * 1000);
@@ -687,19 +707,40 @@
 
                 return safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
                     .then(function (response) {
-                        // console.log('Chart API Response:', response);
                         cachedData = response.data || [];
+                        console.log('Telemetry sample', cachedData[0]); // Temporary diagnostic
                         updateHealthPanel('telemetry', cachedData.length);
                         updateHealthPanel('forensic', [1, 4].includes(currentHours) ? 'ACTIVE' : 'OFF');
 
-                        if ([1, 4].includes(currentHours) && cachedData.length) {
-                            const cacheEnd = new Date(cachedData[cachedData.length - 1].timestamp).getTime();
-                            visualRange.max = cacheEnd - (forensicOffsetHours * 60 * 60 * 1000);
-                            visualRange.min = visualRange.max - (currentHours * 60 * 60 * 1000);
+                        if (cachedData.length > 0) {
+                            const lastPoint = cachedData[cachedData.length - 1];
+                            const lastTs = getTelemetryTs(lastPoint);
+                            
+                            if (lastTs) {
+                                const cacheEnd = new Date(lastTs).getTime();
+                                // Forensic Logic: Offset from end of available data
+                                visualRange.max = cacheEnd - (forensicOffsetHours * 60 * 60 * 1000);
+                                visualRange.min = visualRange.max - (currentHours * 60 * 60 * 1000);
+                            }
                         } else {
-                            visualRange = { min: start.getTime(), max: end.getTime() };
+                            // Fallback if no data
+                            visualRange.max = Date.now();
+                            visualRange.min = visualRange.max - (currentHours * 60 * 60 * 1000);
                         }
+
+                        // Strict Array Guard
+                        if (!Array.isArray(cachedData)) {
+                            console.error('Telemetry payload is not array', cachedData);
+                            return;
+                        }
+
                         renderChart(cachedData);
+
+                        // Lifecycle: Load Tags and Phases using exact same range as telemetry
+                        const startISO = start.toISOString();
+                        const endISO = end.toISOString();
+                        loadTags(startISO, endISO);
+                        loadPhases(startISO, endISO);
                     })
                     .catch(function (e) {
                         console.error('Chart Data Error:', e);
@@ -717,11 +758,17 @@
             id: 'industrialPhaseOverlay',
             beforeDatasetsDraw(chart) {
                 if (!currentPhases.length || !decimatedData.length) return;
+
+                // Patch: Stabilize Chronological Ordering & Filter Invalid Ranges
+                const sortedPhases = [...currentPhases]
+                    .filter(p => p.start_time_iso && p.end_time_iso && new Date(p.end_time_iso) > new Date(p.start_time_iso))
+                    .sort((a, b) => new Date(a.start_time_iso) - new Date(b.start_time_iso));
+
                 const { ctx, chartArea, scales: { x: xScale } } = chart;
 
-                currentPhases.forEach(function (p) {
-                    const startTs = new Date(p.start_time).getTime();
-                    const endTs = new Date(p.end_time).getTime();
+                sortedPhases.forEach(function (p) {
+                    const startTs = new Date(p.start_time_iso).getTime();
+                    const endTs = new Date(p.end_time_iso).getTime();
 
                     // Performance: Only render if overlaps visible viewport
                     if (endTs < visualRange.min || startTs > visualRange.max) return;
@@ -730,12 +777,15 @@
                     let idxMin = -1;
                     let idxMax = -1;
                     for (let d = 0; d < decimatedData.length; d++) {
-                        const ts = new Date(decimatedData[d].timestamp).getTime();
+                        const pointTs = getTelemetryTs(decimatedData[d]);
+                        if (!pointTs) continue;
+                        const ts = new Date(pointTs).getTime();
                         if (idxMin === -1 && ts >= startTs) idxMin = d;
                         if (ts <= endTs) idxMax = d;
                     }
 
-                    if (idxMin !== -1 && idxMax !== -1 && idxMax >= idxMin) {
+                    // Patch: Index Range Guards
+                    if (idxMin < 0 || idxMax < 0 || idxMax < idxMin) return;
                         const xStart = xScale.getPixelForValue(idxMin);
                         const xEnd = xScale.getPixelForValue(idxMax);
                         const width = xEnd - xStart;
@@ -813,7 +863,6 @@
                             ctx.restore();
                         }
                         ctx.restore();
-                    }
                 });
             }
         };
@@ -828,8 +877,13 @@
 
                 // Patch 1: Filter data to visualRange for Category Scale Precision
                 const filteredData = data.filter(function (item) {
-                    const ts = new Date(item.timestamp).getTime();
-                    return ts >= visualRange.min && ts <= visualRange.max;
+                    const itemTs = getTelemetryTs(item);
+                    if (!itemTs) return false;
+                    const ts = new Date(itemTs).getTime();
+                    // Fallback to true if visualRange is not properly set
+                    const inMin = visualRange.min ? ts >= visualRange.min : true;
+                    const inMax = visualRange.max ? ts <= visualRange.max : true;
+                    return inMin && inMax;
                 });
 
                 // Decimation logic: step = ceil(total / 3000)
@@ -839,7 +893,7 @@
 
                 // Category Scale: Labels MUST match data points
                 const labels = decimatedData.map(function (item) {
-                    return formatWIB(item.timestamp).split(' ')[1]; // Time only
+                    return formatWIB(getTelemetryTs(item)).split(' ')[1]; // Time only
                 });
                 const powerData = decimatedData.map(item => item.power_kw);
                 const voltageData = decimatedData.map(item => item.voltage);
@@ -928,8 +982,6 @@
                     return;
                 }
 
-                console.log('Industrial Recovery: Chart rendered with ' + labels.length + ' points.');
-
                 // Patch 5 & 6: Safe Click Tagging
                 if (canvasEl) {
                     canvasEl.onclick = function (e) {
@@ -937,8 +989,8 @@
                         const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
                         if (points.length) {
                             const firstPoint = points[0];
-                            const label = decimatedData[firstPoint.index].timestamp;
-                            openTagModal(label);
+                            const label = getTelemetryTs(decimatedData[firstPoint.index]);
+                            if (label) openTagModal(label);
                         }
                     };
                 }
@@ -1012,10 +1064,6 @@
                 .catch(function (err) { alert(err.message || 'Validation failed'); });
         };
 
-        window.deleteTag = function (id) {
-            // Deprecated direct delete, now using modal
-        };
-
         window.openDeleteModal = function (id, timestamp, type) {
             if (isReadonly) return;
             document.getElementById('delete-tag-id').value = id;
@@ -1057,9 +1105,12 @@
             document.getElementById('health-last-refresh').textContent = new Date().toLocaleTimeString();
         }
 
-        function loadTags() {
+        function loadTags(start = null, end = null) {
             try {
-                safeFetch(`{{ url('api/machines') }}/${deviceId}/tags`)
+                let url = `{{ url('api/machines') }}/${deviceId}/tags`;
+                if (start && end) url += `?start=${start}&end=${end}`;
+
+                safeFetch(url)
                     .then(function (tags) {
                         currentTags = tags;
                         updateHealthPanel('tags', tags.length);
@@ -1070,9 +1121,12 @@
             } catch (err) { console.error('loadTags Crash:', err); }
         }
 
-        function loadPhases() {
+        function loadPhases(start = null, end = null) {
             try {
-                safeFetch(`{{ url('api/machines') }}/${deviceId}/phases`)
+                let url = `{{ url('api/machines') }}/${deviceId}/phases`;
+                if (start && end) url += `?start=${start}&end=${end}`;
+
+                safeFetch(url)
                     .then(function (phases) {
                         currentPhases = phases;
                         updateHealthPanel('phases', phases.length);
@@ -1097,7 +1151,9 @@
                 // Map timestamp to nearest Index
                 let idxTag = -1;
                 for (let d = 0; d < decimatedData.length; d++) {
-                    const ts = new Date(decimatedData[d].timestamp).getTime();
+                    const pointTs = getTelemetryTs(decimatedData[d]);
+                    if (!pointTs) continue;
+                    const ts = new Date(pointTs).getTime();
                     if (ts >= time) { idxTag = d; break; }
                 }
 
@@ -1136,10 +1192,6 @@
                 end: 'rgba(244, 67, 54, 0.10)'         // END
             };
             return c[type] || 'rgba(158, 158, 158, 0.05)';
-        }
-
-        function drawTagAnnotations() {
-            redrawAnnotations(); // Legacy bridge
         }
 
         function renderTimeline(tags) {
@@ -1285,7 +1337,7 @@
                                 : '<span class="text-error font-bold">' + (r.telemetry_quality || 'NULL') + '</span>';
 
                             tr.innerHTML = `
-                            <td class="px-4 py-2 font-mono text-outline">${formatWIB(r.recorded_at)}</td>
+                            <td class="px-4 py-2 font-mono text-outline">${formatWIB(getTelemetryTs(r))}</td>
                             <td class="px-4 py-2 text-right font-black ${statusColor}">${pwr}</td>
                             <td class="px-4 py-2 text-right text-outline">${vlt}</td>
                             <td class="px-4 py-2 text-right text-outline">${cur}</td>
@@ -1298,7 +1350,7 @@
                             </td>
                             <td class="px-4 py-2 text-center text-[9px] font-black">${qualityBadge}</td>
                             <td class="px-4 py-2 text-right">
-                                <button onclick="openTagModal('${r.recorded_at}')" class="text-primary hover:underline font-black uppercase text-[9px]">Tag</button>
+                                <button onclick="openTagModal('${getTelemetryTs(r)}')" class="text-primary hover:underline font-black uppercase text-[9px]">Tag</button>
                             </td>
                         `;
                             tbody.appendChild(tr);
@@ -1306,17 +1358,20 @@
 
                         // Patch 4: Stall Detection
                         if (data.data.length > 0) {
-                            const latest = new Date(data.data[0].recorded_at);
-                            const diffSec = (new Date() - latest) / 1000;
-                            updateHealthPanel('telemetry-freshness', Math.floor(diffSec) + 's');
+                            const latestTs = getTelemetryTs(data.data[0]);
+                            if (latestTs) {
+                                const latest = new Date(latestTs);
+                                const diffSec = (new Date() - latest) / 1000;
+                                updateHealthPanel('telemetry-freshness', Math.floor(diffSec) + 's');
 
-                            const stallIndicator = document.getElementById('health-stall-indicator');
-                            if (diffSec > 180) { // 3 intervals (assuming 60s)
-                                stallIndicator.classList.remove('hidden');
-                                updateHealthPanel('status', 'STALE', 'text-amber-600');
-                            } else {
-                                stallIndicator.classList.add('hidden');
-                                updateHealthPanel('status', 'STABLE', 'text-primary');
+                                const stallIndicator = document.getElementById('health-stall-indicator');
+                                if (diffSec > 180) { // 3 intervals (assuming 60s)
+                                    stallIndicator.classList.remove('hidden');
+                                    updateHealthPanel('status', 'STALE', 'text-amber-600');
+                                } else {
+                                    stallIndicator.classList.add('hidden');
+                                    updateHealthPanel('status', 'STABLE', 'text-primary');
+                                }
                             }
                         }
 
@@ -1344,17 +1399,6 @@
             }
         }
 
-        function initDashboard() {
-            try {
-                loadChartData();
-                loadTags();
-                loadPhases();
-                loadTelemetry();
-            } catch (e) {
-                console.error('Dashboard Init Failed:', e);
-                updateHealthPanel('status', 'INIT FAIL', 'text-error');
-            }
-        }
 
         window.exportPhases = function(format) {
             if (!currentPhases.length) return alert('No phase data available for export.');
@@ -1413,8 +1457,20 @@
             };
         }
 
+        function initDashboard() {
+            try {
+                loadChartData();
+                loadTelemetry();
+            } catch (e) {
+                console.error('Dashboard Init Failed:', e);
+                updateHealthPanel('status', 'INIT FAIL', 'text-error');
+            }
+        }
+
         initDashboard();
         // Set auto-refresh for telemetry watchdog
         setInterval(loadTelemetry, 60000);
     });
 </script>
+
+@endsection

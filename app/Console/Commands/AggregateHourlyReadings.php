@@ -17,7 +17,7 @@ class AggregateHourlyReadings extends Command
     {
         $startTime = microtime(true);
         try {
-            $targetStr = $this->option('time') ?: now()->subHour()->startOfHour()->toDateTimeString();
+            $targetStr = $this->option('time') ?: now('Asia/Jakarta')->subHour()->startOfHour()->toDateTimeString();
             $targetTime = Carbon::parse($targetStr);
             
             $start = $targetTime->copy()->startOfHour()->toDateTimeString();
@@ -86,6 +86,20 @@ class AggregateHourlyReadings extends Command
                     'avg_voltage', 'avg_current', 'avg_power_factor', 'sample_count'
                 ]
             );
+
+            // --- STUB DAILY RECORD FOR LIVE VISIBILITY ---
+            // Create/update a "daily" stub so the report controller can find it and hydrateLive() it
+            foreach ($aggregates as $agg) {
+                \App\Models\PowerReadingDaily::firstOrCreate([
+                    'device_id' => $agg->device_id,
+                    'recorded_date' => $targetTime->toDateString()
+                ], [
+                    'kwh_total' => 0,
+                    'kwh_usage' => 0,
+                    'total_sample_count' => 0,
+                    'data_source' => 'live'
+                ]);
+            }
 
             $duration = (int)((microtime(true) - $startTime) * 1000);
             \App\Models\SchedulerRun::log('energy:aggregate-hourly', true, $duration, 'Window: ' . $start);

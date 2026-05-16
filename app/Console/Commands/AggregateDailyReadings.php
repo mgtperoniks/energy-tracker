@@ -16,7 +16,7 @@ class AggregateDailyReadings extends Command
     {
         $startTime = microtime(true);
         try {
-            $targetStr = $this->option('date') ?: now()->subDay()->toDateString();
+            $targetStr = $this->option('date') ?: now('Asia/Jakarta')->subDay()->toDateString();
             $targetDate = Carbon::parse($targetStr);
             
             $start = $targetDate->copy()->startOfDay()->toDateTimeString();

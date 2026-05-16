@@ -30,15 +30,25 @@ class OperationalEventTagController extends Controller
         $start = $request->query('start');
         $end = $request->query('end');
 
-        // Patch 6: Limit timeline render to latest 100 entries to prevent DOM bloat
+        // Patch: Detect Historical Mode
+        $isHistorical = ($start && $end);
+
         $query = OperationalEventTag::query()->with('tagger')
             ->where('device_id', $deviceId);
 
-        if ($start && $end) {
-            $query->whereBetween('event_time', [Carbon::parse($start)->setTimezone('Asia/Jakarta'), Carbon::parse($end)->setTimezone('Asia/Jakarta')]);
+        if ($isHistorical) {
+            $query->whereBetween('event_time', [
+                Carbon::parse($start)->setTimezone('Asia/Jakarta'), 
+                Carbon::parse($end)->setTimezone('Asia/Jakarta')
+            ]);
+            $query->orderBy('event_time', 'asc');
+            $limit = 2000;
+        } else {
+            $query->orderBy('event_time', 'desc');
+            $limit = 100;
         }
 
-        return response()->json($query->orderBy('event_time', 'desc')->limit(100)->get()->map(function($tag) {
+        return response()->json($query->limit($limit)->get()->map(function($tag) {
             $tag->event_time_iso = Carbon::parse($tag->event_time)->setTimezone('Asia/Jakarta')->toIso8601String();
             return $tag;
         }));
@@ -236,12 +246,29 @@ class OperationalEventTagController extends Controller
 
     public function phases(Request $request, $deviceId)
     {
-        $start = $request->query('start') ? Carbon::parse($request->query('start'))->setTimezone('Asia/Jakarta') : Carbon::now('Asia/Jakarta')->subHours(12);
-        $end = $request->query('end') ? Carbon::parse($request->query('end'))->setTimezone('Asia/Jakarta') : Carbon::now('Asia/Jakarta');
+        $startParam = $request->query('start');
+        $endParam = $request->query('end');
+
+        if ($startParam && $endParam) {
+            $start = Carbon::parse($startParam)->setTimezone('Asia/Jakarta');
+            $end = Carbon::parse($endParam)->setTimezone('Asia/Jakarta');
+            $limit = 1000;
+            $sortAsc = true;
+        } else {
+            $start = Carbon::now('Asia/Jakarta')->subHours(12);
+            $end = Carbon::now('Asia/Jakarta');
+            $limit = 15;
+            $sortAsc = false;
+        }
 
         $phases = $this->getReconstructedPhases($deviceId, $start, $end);
+        
+        // Final Hard Guarantee: Chronological Order (Oldest to Newest)
+        usort($phases, function($a, $b) {
+            return strtotime($a['start_time_iso']) <=> strtotime($b['start_time_iso']);
+        });
 
-        return response()->json(array_slice($phases, 0, 15));
+        return response()->json(array_slice($phases, 0, $limit));
     }
 
     private function getReconstructedPhases($deviceId, $start, $end)
@@ -334,7 +361,7 @@ class OperationalEventTagController extends Controller
             ];
         }
 
-        return array_reverse($phases);
+        return $phases;
     }
 
     public function exportPhases(Request $request, $deviceId)

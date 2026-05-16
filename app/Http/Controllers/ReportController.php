@@ -19,8 +19,8 @@ class ReportController extends Controller
     public function operational(Request $request)
     {
         $deviceId = $request->query('device_id');
-        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
-        $endDate = $request->query('end_date', now()->toDateString());
+        $startDate = $request->query('start_date', now('Asia/Jakarta')->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now('Asia/Jakarta')->toDateString());
         
         $devices = Device::with('machine')->get();
         
@@ -33,21 +33,31 @@ class ReportController extends Controller
             return $report->hydrateLive();
         });
 
-        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate'));
+        $schedulerHealth = [
+            'hourly' => \App\Models\SchedulerRun::where('job_name', 'energy:aggregate-hourly')->first(),
+            'daily' => \App\Models\SchedulerRun::where('job_name', 'energy:aggregate-daily')->first(),
+        ];
+
+        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate', 'schedulerHealth'));
     }
 
     public function exportOperational(Request $request)
     {
         $deviceId = $request->query('device_id');
-        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
-        $endDate = $request->query('end_date', now()->toDateString());
+        $startDate = $request->query('start_date', now('Asia/Jakarta')->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now('Asia/Jakarta')->toDateString());
 
-        $filename = 'energy_operational_report_' . now()->format('Ymd_Hi') . '.xlsx';
+        $filename = 'energy_operational_report_' . now('Asia/Jakarta')->format('Ymd_Hi') . '.xlsx';
 
         $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
 
+        // Fetch and Hydrate Collection explicitly
+        $reports = $query->get()->each(function($row) {
+            $row->hydrateLive();
+        });
+
         return Excel::download(
-            new OperationalReportExport($query), 
+            new OperationalReportExport($reports), 
             $filename
         );
     }
@@ -55,8 +65,8 @@ class ReportController extends Controller
     public function exportOperationalPdf(Request $request)
     {
         $deviceId = $request->query('device_id');
-        $startDate = $request->query('start_date', now()->subDays(7)->toDateString());
-        $endDate = $request->query('end_date', now()->toDateString());
+        $startDate = $request->query('start_date', now('Asia/Jakarta')->subDays(7)->toDateString());
+        $endDate = $request->query('end_date', now('Asia/Jakarta')->toDateString());
 
         $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
         

@@ -17,12 +17,9 @@ class OperationalReportExport implements FromCollection, WithHeadings, WithMappi
     protected $collection;
     protected $summary;
 
-    public function __construct($query)
+    public function __construct($collection)
     {
-        // Fetch and hydrate data once
-        $this->collection = $query->get()->each(function($row) {
-            $row->hydrateLive();
-        });
+        $this->collection = $collection;
 
         // Pre-calculate summary from hydrated collection
         $this->summary = [

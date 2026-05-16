@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
 class PowerReadingDaily extends Model
 {
     protected $table = 'power_readings_daily';
@@ -36,40 +39,58 @@ class PowerReadingDaily extends Model
      */
     public function hydrateLive()
     {
-        $today = now()->toDateString();
+        $today = now('Asia/Jakarta')->toDateString();
+        $isToday = $this->recorded_date->toDateString() === $today;
         
-        // Jika data hari ini DAN (belum ada sample atau peak load nol)
-        if ($this->recorded_date->toDateString() === $today && ($this->total_sample_count == 0 || $this->max_power_kw == 0)) {
-            $liveData = PowerReadingRaw::where('device_id', $this->device_id)
-                ->whereDate('recorded_at', $today)
-                ->selectRaw('
-                    MAX(power_kw) as live_max_power,
-                    AVG(power_kw) as live_avg_power,
-                    AVG(voltage) as live_avg_voltage,
-                    AVG(current) as live_avg_current,
-                    AVG(power_factor) as live_avg_pf,
-                    COUNT(*) as live_samples
-                ')
-                ->first();
+        // Industrial Historian Mode: Always hydrate if it's today
+        if ($isToday) {
+            $cacheKey = "daily_live_{$this->device_id}_{$today}";
+            $startTime = microtime(true);
+            
+            $liveData = Cache::remember($cacheKey, 300, function () use ($today) {
+                return PowerReadingRaw::where('device_id', $this->device_id)
+                    ->whereDate('recorded_at', $today)
+                    ->selectRaw('
+                        MAX(kwh_total) as live_kwh_total,
+                        GREATEST(MAX(kwh_total) - MIN(kwh_total), 0) as live_kwh_usage,
+                        MAX(power_kw) as live_max_power,
+                        AVG(power_kw) as live_avg_power,
+                        AVG(voltage) as live_avg_voltage,
+                        AVG(current) as live_avg_current,
+                        AVG(power_factor) as live_avg_pf,
+                        COUNT(*) as live_samples
+                    ')
+                    ->first();
+            });
 
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            Log::debug("hydrateLive Execute", [
+                'device_id' => $this->device_id,
+                'date' => $today,
+                'duration_ms' => $duration,
+                'cache_hit' => $duration < 5 ? true : false
+            ]);
+
+            // Phase 5: Safe Hydration Guard - ONLY overwrite if we have real samples
             if ($liveData && $liveData->live_samples > 0) {
+                $this->kwh_total = (float) $liveData->live_kwh_total;
+                $this->kwh_usage = (float) $liveData->live_kwh_usage;
                 $this->max_power_kw = (float) $liveData->live_max_power;
                 $this->avg_power_kw = (float) $liveData->live_avg_power;
                 $this->avg_voltage  = (float) $liveData->live_avg_voltage;
                 $this->avg_current  = (float) $liveData->live_avg_current;
                 $this->avg_power_factor = (float) $liveData->live_avg_pf;
                 $this->total_sample_count = (int) $liveData->live_samples;
+                $this->data_source = 'live';
             }
 
-            // Always calculate energy cost if usage exists for today
+            // Always calculate energy cost for today
             if ($this->kwh_usage > 0) {
-                // Use snapshot if exists, otherwise fallback to live lookup
                 if ($this->tariff_rate_snapshot) {
                     $activeRate = (float) $this->tariff_rate_snapshot;
                 } else {
                     $activeRate = ElectricityTariff::getRateForDate($today);
                 }
-                
                 $this->energy_cost = (float) ($this->kwh_usage * $activeRate);
             }
         }
@@ -82,25 +103,23 @@ class PowerReadingDaily extends Model
      */
     public function getDataSourceBadgeAttribute()
     {
+        $today = now('Asia/Jakarta')->toDateString();
+        $isToday = $this->recorded_date->toDateString() === $today;
         $source = $this->data_source ?? 'live';
-        $styles = [
-            'live' => 'bg-success/10 text-success border-success/20',
-            'manual_backfill' => 'bg-warning/10 text-warning border-warning/20',
-            'recovered' => 'bg-info/10 text-info border-info/20',
-            'estimated' => 'bg-error/10 text-error border-error/20',
-        ];
         
-        $labels = [
-            'live' => 'LIVE',
-            'manual_backfill' => 'BACKFILLED',
-            'recovered' => 'RECOVERED',
-            'estimated' => 'ESTIMATED',
-        ];
-        
-        $class = $styles[$source] ?? $styles['live'];
-        $label = $labels[$source] ?? $labels['live'];
-        
-        return "<span class=\"px-1.5 py-0.5 rounded border {$class} text-[9px] font-black tracking-wider\">{$label}</span>";
+        if ($isToday) {
+            return '<span class="px-1.5 py-0.5 rounded border bg-primary/10 text-primary border-primary/20 text-[9px] font-black tracking-wider">LIVE</span>';
+        }
+
+        if ($source === 'live' || $source === 'finalized') {
+            return '<span class="px-1.5 py-0.5 rounded border bg-success/10 text-success border-success/20 text-[9px] font-black tracking-wider">FINALIZED</span>';
+        }
+
+        if ($source === 'manual_backfill' || $source === 'recovered') {
+             return '<span class="px-1.5 py-0.5 rounded border bg-warning/10 text-warning border-warning/20 text-[9px] font-black tracking-wider">BACKFILLED</span>';
+        }
+
+        return '<span class="px-1.5 py-0.5 rounded border bg-error/10 text-error border-error/20 text-[9px] font-black tracking-wider">ESTIMATED</span>';
     }
 
     /**
@@ -113,6 +132,6 @@ class PowerReadingDaily extends Model
         }
 
         // Fallback for legacy or un-aggregated data
-        return ElectricityTariff::getRateForDate($this->recorded_date->toDateString());
+        return ElectricityTariff::getRateForDate($this->recorded_date->toDateString(), 'Asia/Jakarta');
     }
 }

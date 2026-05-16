@@ -8,6 +8,28 @@
             <p class="text-on-surface-variant text-sm mt-1">Laporan harian metrik teknis per power meter.</p>
         </div>
 
+        @php
+            $isHourlyStale = !$schedulerHealth['hourly'] || $schedulerHealth['hourly']->updated_at->diffInHours(now()) > 2;
+            $isDailyStale = !$schedulerHealth['daily'] || $schedulerHealth['daily']->updated_at->diffInHours(now()) > 26;
+        @endphp
+
+        @if($isHourlyStale || $isDailyStale)
+            <div class="mb-6 p-4 bg-error-container text-on-error-container rounded-lg border border-error/20 flex items-center gap-4 shadow-sm animate-pulse">
+                <span class="material-symbols-outlined text-2xl">history_toggle_off</span>
+                <div>
+                    <h3 class="font-black text-xs uppercase tracking-widest">Industrial Historian Pipeline Stale</h3>
+                    <p class="text-[11px] font-medium opacity-90">
+                        @if($isHourlyStale) 
+                            • Hourly Aggregation stopped at {{ $schedulerHealth['hourly'] ? $schedulerHealth['hourly']->updated_at->format('d M H:i') : 'Never' }}
+                        @endif
+                        @if($isDailyStale)
+                            <br>• Daily Aggregation stopped at {{ $schedulerHealth['daily'] ? $schedulerHealth['daily']->updated_at->format('d M H:i') : 'Never' }}
+                        @endif
+                    </p>
+                </div>
+            </div>
+        @endif
+
         <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm border border-surface-container-low mb-8">
             <form method="GET" action="{{ route('analytics.operational') }}" class="flex flex-col md:flex-row gap-4 items-end">
                 <div class="flex-1">
