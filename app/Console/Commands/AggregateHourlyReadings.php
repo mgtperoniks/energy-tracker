@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use App\Models\PowerReadingRaw;
 use App\Models\PowerReadingHourly;
 use App\Models\PollerLog;
@@ -88,16 +89,26 @@ class AggregateHourlyReadings extends Command
             );
 
             // --- STUB DAILY RECORD FOR LIVE VISIBILITY ---
-            // Create/update a "daily" stub so the report controller can find it and hydrateLive() it
+            // Uses INSERT IGNORE instead of firstOrCreate() to avoid MySQL error 1364.
+            //
+            // Root cause of the original crash (2026-05-16):
+            //   Laravel 11's firstOrCreate() internally calls createOrFirst(), which first
+            //   attempts an INSERT using only the search-key columns (device_id, recorded_date).
+            //   Because kwh_total is NOT NULL with no DEFAULT, MySQL rejects with error 1364.
+            //
+            // Fix: DB::table()->insertOrIgnore() always provides ALL required columns upfront.
+            //   - If row does not exist → full INSERT succeeds with zero-value stub.
+            //   - If row already exists → duplicate key → IGNORE → existing row is untouched.
+            //   - Idempotent: safe to run multiple times per day.
+            //   - Finalized/backfilled records are NEVER overwritten.
             foreach ($aggregates as $agg) {
-                \App\Models\PowerReadingDaily::firstOrCreate([
-                    'device_id' => $agg->device_id,
-                    'recorded_date' => $targetTime->toDateString()
-                ], [
-                    'kwh_total' => 0,
-                    'kwh_usage' => 0,
+                DB::table('power_readings_daily')->insertOrIgnore([
+                    'device_id'          => $agg->device_id,
+                    'recorded_date'      => $targetTime->toDateString(),
+                    'kwh_total'          => 0,
+                    'kwh_usage'          => 0,
                     'total_sample_count' => 0,
-                    'data_source' => 'live'
+                    'data_source'        => 'live',
                 ]);
             }
 

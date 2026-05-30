@@ -16,38 +16,76 @@ class AuditController extends Controller
     public function index(Request $request)
     {
         $viewMode = $request->query('view_mode', 'flat'); // flat or grouped
-        
-        $query = AuditLog::with('device.machine');
+        $isFiltered = $request->has('start_date');
 
-        // Apply Filters
-        $query = $this->applyFilters($query, $request);
+        $logs = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50);
+        $devices = Device::all();
+        $summary = [
+            'critical_open' => 0,
+            'error_open'    => 0,
+            'acknowledged'  => 0,
+            'today_incidents' => 0,
+            'resolved_today'  => 0,
+            'mttr_minutes'    => 0,
+            'mtta_minutes'    => 0,
+            'top_device'      => 'System'
+        ];
 
-        if ($viewMode === 'grouped') {
-            // Group by fingerprint and status to see recurring issues
-            // Fix: Use the existing filtered query object instead of starting fresh
-            $logs = $query->select(
-                    'fingerprint',
-                    'event_code',
-                    'event_type',
-                    'severity',
-                    'title',
-                    'status',
-                    'device_id',
-                    DB::raw('count(*) as incident_count'),
-                    DB::raw('min(detected_at) as first_seen'),
-                    DB::raw('max(detected_at) as last_seen')
-                )
-                ->groupBy('fingerprint', 'event_code', 'event_type', 'severity', 'title', 'status', 'device_id')
-                ->orderByDesc('last_seen')
-                ->paginate(50);
-        } else {
-            $logs = $query->orderByDesc('detected_at')->paginate(50);
+        if ($isFiltered) {
+            $startDate = $request->query('start_date');
+            $endDate = $request->query('end_date');
+
+            if (!$startDate || !$endDate) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['date_range' => 'Silakan pilih rentang tanggal pencarian audit terlebih dahulu.']);
+            }
+
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
+
+            if ($start->greaterThan($end)) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['date_range' => 'Tanggal mulai tidak boleh melebihi tanggal akhir.']);
+            }
+
+            if ($start->diffInDays($end) > 45) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['date_range' => 'Rentang tanggal maksimal 45 hari. Silakan gunakan filter yang lebih spesifik.']);
+            }
+
+            $query = AuditLog::with('device.machine');
+
+            // Apply Filters
+            $query = $this->applyFilters($query, $request);
+
+            if ($viewMode === 'grouped') {
+                // Group by fingerprint and status to see recurring issues
+                $logs = $query->select(
+                        'fingerprint',
+                        'event_code',
+                        'event_type',
+                        'severity',
+                        'title',
+                        'status',
+                        'device_id',
+                        DB::raw('count(*) as incident_count'),
+                        DB::raw('min(detected_at) as first_seen'),
+                        DB::raw('max(detected_at) as last_seen')
+                    )
+                    ->groupBy('fingerprint', 'event_code', 'event_type', 'severity', 'title', 'status', 'device_id')
+                    ->orderByDesc('last_seen')
+                    ->paginate(50)->withQueryString();
+            } else {
+                $logs = $query->orderByDesc('detected_at')->paginate(50)->withQueryString();
+            }
+
+            $summary = $this->getKpiSummary();
         }
 
-        $devices = Device::all();
-        $summary = $this->getKpiSummary();
-
-        return view('admin.audit_logs', compact('logs', 'devices', 'summary', 'viewMode'));
+        return view('admin.audit_logs', compact('logs', 'devices', 'summary', 'viewMode', 'isFiltered'));
     }
 
     private function applyFilters($query, Request $request)

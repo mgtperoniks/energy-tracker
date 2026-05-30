@@ -92,7 +92,7 @@
 <body>
     <div class="header">
         <h1>Operational Energy Report</h1>
-        <p>Industrial Site A - Heavy Industrial Wing</p>
+        <p>Peroni Karya Sentra Energy System</p>
     </div>
 
     <table class="info-table">
