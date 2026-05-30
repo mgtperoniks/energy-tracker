@@ -47,8 +47,15 @@ class PowerReadingDaily extends Model
             $cacheKey = "daily_live_{$this->device_id}_{$today}";
             $startTime = microtime(true);
             
-            $liveData = Cache::remember($cacheKey, 300, function () use ($today) {
-                return PowerReadingRaw::where('device_id', $this->device_id)
+            // Defensive recovery: forget cache if not a plain array
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null && !is_array($cached)) {
+                Cache::forget($cacheKey);
+                $cached = null;
+            }
+
+            if ($cached === null) {
+                $rawResult = PowerReadingRaw::where('device_id', $this->device_id)
                     ->whereDate('recorded_at', $today)
                     ->selectRaw('
                         MAX(kwh_total) as live_kwh_total,
@@ -61,7 +68,12 @@ class PowerReadingDaily extends Model
                         COUNT(*) as live_samples
                     ')
                     ->first();
-            });
+
+                $liveData = $rawResult ? $rawResult->toArray() : null;
+                Cache::put($cacheKey, $liveData, 300);
+            } else {
+                $liveData = $cached;
+            }
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
             Log::debug("hydrateLive Execute", [
@@ -72,15 +84,15 @@ class PowerReadingDaily extends Model
             ]);
 
             // Phase 5: Safe Hydration Guard - ONLY overwrite if we have real samples
-            if ($liveData && $liveData->live_samples > 0) {
-                $this->kwh_total = (float) $liveData->live_kwh_total;
-                $this->kwh_usage = (float) $liveData->live_kwh_usage;
-                $this->max_power_kw = (float) $liveData->live_max_power;
-                $this->avg_power_kw = (float) $liveData->live_avg_power;
-                $this->avg_voltage  = (float) $liveData->live_avg_voltage;
-                $this->avg_current  = (float) $liveData->live_avg_current;
-                $this->avg_power_factor = (float) $liveData->live_avg_pf;
-                $this->total_sample_count = (int) $liveData->live_samples;
+            if ($liveData && isset($liveData['live_samples']) && $liveData['live_samples'] > 0) {
+                $this->kwh_total = (float) ($liveData['live_kwh_total'] ?? 0);
+                $this->kwh_usage = (float) ($liveData['live_kwh_usage'] ?? 0);
+                $this->max_power_kw = (float) ($liveData['live_max_power'] ?? 0);
+                $this->avg_power_kw = (float) ($liveData['live_avg_power'] ?? 0);
+                $this->avg_voltage  = (float) ($liveData['live_avg_voltage'] ?? 0);
+                $this->avg_current  = (float) ($liveData['live_avg_current'] ?? 0);
+                $this->avg_power_factor = (float) ($liveData['live_avg_pf'] ?? 0);
+                $this->total_sample_count = (int) $liveData['live_samples'];
                 $this->data_source = 'live';
             }
 
