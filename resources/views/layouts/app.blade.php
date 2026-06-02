@@ -152,10 +152,10 @@
 </header>
 
 <!-- SideNavBar -->
-<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col py-4 z-40">
-    <div class="px-6 mb-6">
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col py-2.5 z-40">
+    <div class="px-6 mb-3.5">
         <h2 class="text-sky-700 dark:text-sky-400 font-bold uppercase tracking-widest text-[10px]">Industrial Site A</h2>
-        <div class="flex items-center gap-2 mt-1">
+        <div class="flex items-center gap-2 mt-0.5">
             <span class="w-2 h-2 rounded-full bg-secondary"></span>
             <span class="text-slate-500 dark:text-slate-400 text-xs font-medium">Active Monitor</span>
         </div>
@@ -165,16 +165,16 @@
         $currentRouteName = Route::currentRouteName();
     @endphp
 
-    <nav class="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar pb-4">
+    <nav class="flex-1 px-3 space-y-0.5 overflow-y-auto custom-scrollbar pb-4">
         <!-- 1. OVERVIEW -->
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'dashboard') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('dashboard') }}">
-            <span class="material-symbols-outlined">dashboard</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'dashboard') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('dashboard') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">dashboard</span>
             <span>Overview</span>
         </a>
 
         <!-- 2. MONITORING -->
-        <div class="pt-4 pb-1">
-            <p class="px-4 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Monitoring</p>
+        <div class="pt-2.5 pb-0.5">
+            <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Monitoring</p>
         </div>
         
         @php
@@ -183,15 +183,15 @@
         @endphp
 
         <details class="group" @if($isMonitoringOpen) open @endif>
-            <summary class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'monitoring.meters')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
-                <span class="material-symbols-outlined shrink-0">electric_meter</span>
+            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'monitoring.meters')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+                <span class="material-symbols-outlined text-[20px] shrink-0">electric_meter</span>
                 <span class="flex-1 truncate">Power Meters</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-sm shrink-0">expand_more</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
             </summary>
-            <div class="mt-1 flex flex-col gap-y-1 border-l-2 border-slate-200 dark:border-slate-700 ml-6 pl-2 py-2 max-h-[320px] overflow-y-auto custom-scrollbar">
+            <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1 max-h-[320px] overflow-y-auto custom-scrollbar">
                 @foreach($sidebarMeters as $meter)
                     <a href="{{ route('monitoring.meters', ['id' => $meter->id]) }}" 
-                       class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'monitoring.meters' && request()->route('id') == $meter->id) text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                       class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'monitoring.meters' && request()->route('id') == $meter->id) text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                         <span class="font-bold text-sky-700 dark:text-sky-400 shrink-0 uppercase">{{ $meter->code }}</span>
                         <span class="mx-1 text-slate-300 dark:text-slate-600 shrink-0">-</span>
                         <span class="truncate">{{ $meter->name }}</span>
@@ -200,94 +200,94 @@
             </div>
         </details>
         
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'monitoring.environmental') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.environmental') }}">
-            <span class="material-symbols-outlined">thermostat</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.environmental') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.environmental') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">thermostat</span>
             <span>Environmental</span>
         </a>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'monitoring.health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.health') }}">
-            <span class="material-symbols-outlined">monitor_heart</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.health') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">monitor_heart</span>
             <span>System Health</span>
         </a>
 
         <!-- 3. ANALYTICS -->
-        <div class="pt-4 pb-1">
-            <p class="px-4 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Analytics</p>
+        <div class="pt-2.5 pb-0.5">
+            <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Analytics</p>
         </div>
         <details class="group" @if(Str::startsWith($currentRouteName, 'analytics.')) open @endif>
-            <summary class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'analytics.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
-                <span class="material-symbols-outlined shrink-0">analytics</span>
+            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'analytics.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+                <span class="material-symbols-outlined text-[20px] shrink-0">analytics</span>
                 <span class="flex-1 truncate">Reports</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-sm shrink-0">expand_more</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
             </summary>
-            <div class="mt-1 flex flex-col gap-y-1 border-l-2 border-slate-200 dark:border-slate-700 ml-6 pl-2 py-2">
-                <a href="{{ route('analytics.operational') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.operational') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+            <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1">
+                <a href="{{ route('analytics.operational') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.operational') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Operational Report
                 </a>
-                <a href="{{ route('analytics.accounting') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.accounting') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                <a href="{{ route('analytics.accounting') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.accounting') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Accounting Report
                 </a>
-                <a href="{{ route('analytics.audit') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                <a href="{{ route('analytics.audit') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     System Audit Trail
                 </a>
-                <a href="{{ route('analytics.tagging-audit') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.tagging-audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                <a href="{{ route('analytics.tagging-audit') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.tagging-audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Tagging Audit Logs
                 </a>
             </div>
         </details>
 
         <!-- 4. ASSETS -->
-        <div class="pt-4 pb-1">
-            <p class="px-4 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Assets</p>
+        <div class="pt-2.5 pb-0.5">
+            <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Assets</p>
         </div>
         <details class="group" @if(Str::startsWith($currentRouteName, 'assets.')) open @endif>
-            <summary class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'assets.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
-                <span class="material-symbols-outlined shrink-0">inventory_2</span>
+            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'assets.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+                <span class="material-symbols-outlined text-[20px] shrink-0">inventory_2</span>
                 <span class="flex-1 truncate">Asset Management</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-sm shrink-0">expand_more</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
             </summary>
-            <div class="mt-1 flex flex-col gap-y-1 border-l-2 border-slate-200 dark:border-slate-700 ml-6 pl-2 py-2">
-                <a href="{{ route('assets.machines') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.machines') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+            <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1">
+                <a href="{{ route('assets.machines') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.machines') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Machines
                 </a>
-                <a href="{{ route('assets.devices') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.devices') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                <a href="{{ route('assets.devices') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.devices') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Power Meters
                 </a>
-                <a href="{{ route('assets.departments') }}" class="flex items-center text-[11px] px-3 py-2 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.departments') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                <a href="{{ route('assets.departments') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.departments') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Departments
                 </a>
             </div>
         </details>
 
         <!-- 5. ADMINISTRATION -->
-        <div class="pt-4 pb-1">
-            <p class="px-4 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Administration</p>
+        <div class="pt-2.5 pb-0.5">
+            <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Administration</p>
         </div>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.tariffs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.tariffs') }}">
-            <span class="material-symbols-outlined">payments</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.tariffs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.tariffs') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">payments</span>
             <span>Tariff Management</span>
         </a>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.thresholds') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.thresholds') }}">
-            <span class="material-symbols-outlined">tune</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.thresholds') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.thresholds') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">tune</span>
             <span>Threshold Settings</span>
         </a>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.device-config') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.device-config') }}">
-            <span class="material-symbols-outlined">settings_input_component</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.device-config') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.device-config') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">settings_input_component</span>
             <span>Device Config</span>
         </a>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.poller-logs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.poller-logs') }}">
-            <span class="material-symbols-outlined">list_alt</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.poller-logs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.poller-logs') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">list_alt</span>
             <span>Poller Logs</span>
         </a>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.reset-history') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.reset-history') }}">
-            <span class="material-symbols-outlined">history</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.reset-history') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.reset-history') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">history</span>
             <span>Reset History</span>
         </a>
 
-        <div class="pt-4 pb-1">
-            <p class="px-4 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">System Deployment</p>
+        <div class="pt-2.5 pb-0.5">
+            <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">System Deployment</p>
         </div>
-        <a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all @if($currentRouteName == 'admin.deployment-health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.deployment-health') }}">
-            <span class="material-symbols-outlined">health_and_safety</span>
+        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.deployment-health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.deployment-health') }}">
+            <span class="material-symbols-outlined text-[20px] shrink-0">health_and_safety</span>
             <span>Deployment Health</span>
         </a>
 
