@@ -122,7 +122,8 @@
         <tr>
             <td class="label">Billing Period:</td>
             <td>{{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} -
-                {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}</td>
+                {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
+            </td>
             <td class="label" style="text-align: right">Generated At:</td>
             <td style="text-align: right">{{ now()->format('d M Y H:i') }}</td>
         </tr>
@@ -172,7 +173,8 @@
             <span class="label">GRAND TOTAL ENERGY COST</span>
             <span class="total-amount">Rp {{ number_format($totalCost, 0) }}</span>
             <p style="margin: 5px 0 0 0; color: #666; font-size: 9px;">Total Consumption:
-                {{ number_format($totalKwh, 2) }} kWh</p>
+                {{ number_format($totalKwh, 2) }} kWh
+            </p>
         </div>
     </div>
 

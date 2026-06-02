@@ -41,12 +41,12 @@ class PowerReadingDaily extends Model
     {
         $today = now('Asia/Jakarta')->toDateString();
         $isToday = $this->recorded_date->toDateString() === $today;
-        
+
         // Industrial Historian Mode: Always hydrate if it's today
         if ($isToday) {
             $cacheKey = "daily_live_{$this->device_id}_{$today}";
             $startTime = microtime(true);
-            
+
             // Defensive recovery: forget cache if not a plain array
             $cached = Cache::get($cacheKey);
             if ($cached !== null && !is_array($cached)) {
@@ -89,8 +89,8 @@ class PowerReadingDaily extends Model
                 $this->kwh_usage = (float) ($liveData['live_kwh_usage'] ?? 0);
                 $this->max_power_kw = (float) ($liveData['live_max_power'] ?? 0);
                 $this->avg_power_kw = (float) ($liveData['live_avg_power'] ?? 0);
-                $this->avg_voltage  = (float) ($liveData['live_avg_voltage'] ?? 0);
-                $this->avg_current  = (float) ($liveData['live_avg_current'] ?? 0);
+                $this->avg_voltage = (float) ($liveData['live_avg_voltage'] ?? 0);
+                $this->avg_current = (float) ($liveData['live_avg_current'] ?? 0);
                 $this->avg_power_factor = (float) ($liveData['live_avg_pf'] ?? 0);
                 $this->total_sample_count = (int) $liveData['live_samples'];
                 $this->data_source = 'live';
@@ -106,7 +106,7 @@ class PowerReadingDaily extends Model
                 $this->energy_cost = (float) ($this->kwh_usage * $activeRate);
             }
         }
-        
+
         return $this;
     }
 
@@ -118,7 +118,7 @@ class PowerReadingDaily extends Model
         $today = now('Asia/Jakarta')->toDateString();
         $isToday = $this->recorded_date->toDateString() === $today;
         $source = $this->data_source ?? 'live';
-        
+
         if ($isToday) {
             return '<span class="px-1.5 py-0.5 rounded border bg-primary/10 text-primary border-primary/20 text-[9px] font-black tracking-wider">LIVE</span>';
         }
@@ -128,7 +128,7 @@ class PowerReadingDaily extends Model
         }
 
         if ($source === 'manual_backfill' || $source === 'recovered') {
-             return '<span class="px-1.5 py-0.5 rounded border bg-warning/10 text-warning border-warning/20 text-[9px] font-black tracking-wider">BACKFILLED</span>';
+            return '<span class="px-1.5 py-0.5 rounded border bg-warning/10 text-warning border-warning/20 text-[9px] font-black tracking-wider">BACKFILLED</span>';
         }
 
         return '<span class="px-1.5 py-0.5 rounded border bg-error/10 text-error border-error/20 text-[9px] font-black tracking-wider">ESTIMATED</span>';

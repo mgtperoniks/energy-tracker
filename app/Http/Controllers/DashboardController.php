@@ -71,8 +71,9 @@ class DashboardController extends Controller
         $activeRate = \App\Models\ElectricityTariff::getRateForDate($today->toDateString());
 
         if ($todayDailies->isNotEmpty()) {
+            $todayDailies->each->hydrateLive();
             $todayUsage = $todayDailies->sum('kwh_usage');
-            $todayCost = $todayDailies->sum('energy_cost');
+            $todayCost  = $todayDailies->sum('energy_cost');
             $isEstimatedCost = false;
         } else {
             // Fallback: raw reconstruction

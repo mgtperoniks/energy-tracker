@@ -249,10 +249,8 @@
                                 <th class="px-4 py-2 text-center">Status</th>
                                 <th class="px-4 py-2">Phase Name</th>
                                 <th class="px-4 py-2 text-right">Dur</th>
-                                <th class="px-4 py-2 text-right">Avg (kW)</th>
-                                <th class="px-4 py-2 text-right">Peak (kW)</th>
-                                <th class="px-4 py-2 text-right">Usage (kWh)</th>
-                                <th class="px-4 py-2 text-right">Est. Cost</th>
+                                <th class="px-4 py-2 text-right w-28">Usage (kWh)</th>
+                                <th class="px-4 py-2 text-right w-32">Est. Cost</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-surface-container-low bg-white" id="phase-tbody">
@@ -444,6 +442,37 @@
                         <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
                         <span class="text-[9px] font-bold text-outline">SYNCING</span>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Historian Telemetry Datetime Filter Panel -->
+            <div class="px-4 py-3 border-b border-surface-container-low bg-surface-container-low/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button type="button" onclick="setTelemetryPreset('today')" class="px-2 py-1 bg-surface-container-high text-on-surface text-[8px] font-black uppercase tracking-wider rounded hover:bg-primary hover:text-white transition-all shadow-sm">Today</button>
+                    <button type="button" onclick="setTelemetryPreset('yesterday')" class="px-2 py-1 bg-surface-container-high text-on-surface text-[8px] font-black uppercase tracking-wider rounded hover:bg-primary hover:text-white transition-all shadow-sm">Yesterday</button>
+                    <button type="button" onclick="setTelemetryPreset('7days')" class="px-2 py-1 bg-surface-container-high text-on-surface text-[8px] font-black uppercase tracking-wider rounded hover:bg-primary hover:text-white transition-all shadow-sm">Last 7 Days</button>
+                    <button type="button" onclick="setTelemetryPreset('30days')" class="px-2 py-1 bg-surface-container-high text-on-surface text-[8px] font-black uppercase tracking-wider rounded hover:bg-primary hover:text-white transition-all shadow-sm">Last 30 Days</button>
+                </div>
+                
+                <div class="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-surface-container">
+                    <div class="flex flex-col px-2">
+                        <label class="text-[7px] font-black uppercase text-outline">Start Datetime</label>
+                        <input type="datetime-local" id="telemetry-start"
+                            class="bg-transparent text-[9px] font-bold text-on-surface outline-none">
+                    </div>
+                    <div class="flex flex-col px-2 border-l border-surface-container">
+                        <label class="text-[7px] font-black uppercase text-outline">End Datetime</label>
+                        <input type="datetime-local" id="telemetry-end"
+                            class="bg-transparent text-[9px] font-bold text-on-surface outline-none">
+                    </div>
+                    <button type="button" onclick="applyTelemetryFilter()"
+                        class="ml-1 px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 transition-all flex items-center justify-center shadow-sm">
+                        <span class="text-[8px] font-black uppercase tracking-wider">Generate</span>
+                    </button>
+                    <button type="button" onclick="clearTelemetryFilter()" id="btn-clear-telemetry-filter"
+                        class="hidden ml-1 px-2 py-1.5 bg-surface-container-highest text-on-surface rounded hover:brightness-95 transition-all flex items-center justify-center shadow-sm">
+                        <span class="material-symbols-outlined text-[10px]">close</span>
+                    </button>
                 </div>
             </div>
 
@@ -1266,8 +1295,6 @@
                         </div>
                     </td>
                     <td class="px-4 py-2 text-right font-bold text-on-surface">${p.duration_human}</td>
-                    <td class="px-4 py-2 text-right font-medium text-outline">${p.avg_kw}</td>
-                    <td class="px-4 py-2 text-right font-medium text-outline">${p.peak_kw}</td>
                     <td class="px-4 py-2 text-right font-black text-on-surface">${p.usage_kwh}</td>
                     <td class="px-4 py-2 text-right font-black text-tertiary">Rp ${p.est_cost.toLocaleString()}</td>
                 `;
@@ -1281,7 +1308,7 @@
             const totalTr = document.createElement('tr');
             totalTr.className = 'bg-surface-container-low/50 font-black';
             totalTr.innerHTML = `
-                <td colspan="7" class="px-4 py-2 text-right text-primary uppercase tracking-widest text-[9px]">Total Usage & Cost</td>
+                <td colspan="5" class="px-4 py-2 text-right text-primary uppercase tracking-widest text-[9px]">Total Usage & Cost</td>
                 <td class="px-4 py-2 text-right text-on-surface border-t-2 border-primary">${totalUsage.toFixed(2)}</td>
                 <td class="px-4 py-2 text-right text-primary border-t-2 border-primary">Rp ${totalCost.toLocaleString()}</td>
             `;
@@ -1305,9 +1332,73 @@
             }).format(date).replace(/\//g, '-');
         }
 
+        let activeTelemetryFilter = null;
+
+        window.applyTelemetryFilter = function () {
+            const startVal = document.getElementById('telemetry-start').value;
+            const endVal = document.getElementById('telemetry-end').value;
+
+            if (!startVal || !endVal) {
+                alert('Please select both start and end datetime.');
+                return;
+            }
+
+            activeTelemetryFilter = {
+                start: new Date(startVal).toISOString(),
+                end: new Date(endVal).toISOString()
+            };
+
+            const clearBtn = document.getElementById('btn-clear-telemetry-filter');
+            if (clearBtn) clearBtn.classList.remove('hidden');
+            loadTelemetry(1);
+        };
+
+        window.clearTelemetryFilter = function () {
+            document.getElementById('telemetry-start').value = '';
+            document.getElementById('telemetry-end').value = '';
+            activeTelemetryFilter = null;
+            const clearBtn = document.getElementById('btn-clear-telemetry-filter');
+            if (clearBtn) clearBtn.classList.add('hidden');
+            loadTelemetry(1);
+        };
+
+        window.setTelemetryPreset = function (preset) {
+            const now = new Date();
+            let start, end;
+
+            const formatForInput = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+
+            if (preset === 'today') {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            } else if (preset === 'yesterday') {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+            } else if (preset === '7days') {
+                start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                end = now;
+            } else if (preset === '30days') {
+                start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                end = now;
+            }
+
+            document.getElementById('telemetry-start').value = formatForInput(start);
+            document.getElementById('telemetry-end').value = formatForInput(end);
+        };
+
         function loadTelemetry(page = 1) {
             try {
-                const url = `{{ url('api/machines') }}/${deviceId}/readings?limit=15&page=${page}`;
+                let url = `{{ url('api/machines') }}/${deviceId}/readings?limit=15&page=${page}`;
+                if (activeTelemetryFilter) {
+                    url += `&start_date=${encodeURIComponent(activeTelemetryFilter.start)}&end_date=${encodeURIComponent(activeTelemetryFilter.end)}`;
+                }
                 return safeFetch(url)
                     .then(function (response) {
                         const data = response.data;

@@ -52,6 +52,7 @@ class MachineDashboardController extends Controller
                 ->get();
 
             if ($todayDailies->isNotEmpty()) {
+                $todayDailies->each->hydrateLive();
                 $todayConsumption = $todayDailies->sum('kwh_usage');
                 $todayCost = $todayDailies->sum('energy_cost');
             } else {
