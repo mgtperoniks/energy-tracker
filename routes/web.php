@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/audit/{log}/reopen', [\App\Http\Controllers\AuditController::class, 'reopen'])->name('audit.reopen');
         Route::get('/audit/export', [\App\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
         Route::get('/tagging-audit', [\App\Http\Controllers\TaggingAuditController::class, 'index'])->name('tagging-audit');
+        Route::get('/historian', [\App\Http\Controllers\ProductionHistorianController::class, 'index'])->name('historian');
     });
 
     // 4. ASSETS

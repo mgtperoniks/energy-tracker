@@ -366,8 +366,17 @@ class OperationalEventTagController extends Controller
 
     public function exportPhases(Request $request, $deviceId)
     {
-        $start = $request->query('start') ? Carbon::parse($request->query('start')) : now()->subHours(12);
-        $end = $request->query('end') ? Carbon::parse($request->query('end')) : now();
+        $startParam = $request->query('start');
+        $endParam = $request->query('end');
+
+        if ($startParam && $endParam) {
+            $start = Carbon::parse($startParam)->setTimezone('Asia/Jakarta');
+            $end = Carbon::parse($endParam)->setTimezone('Asia/Jakarta');
+        } else {
+            $start = Carbon::now('Asia/Jakarta')->subHours(12);
+            $end = Carbon::now('Asia/Jakarta');
+        }
+
         $device = Device::findOrFail($deviceId);
 
         $phases = $this->getReconstructedPhases($deviceId, $start, $end);
@@ -381,8 +390,17 @@ class OperationalEventTagController extends Controller
 
     public function exportPhasesPdf(Request $request, $deviceId)
     {
-        $start = $request->query('start') ? Carbon::parse($request->query('start')) : now()->subHours(12);
-        $end = $request->query('end') ? Carbon::parse($request->query('end')) : now();
+        $startParam = $request->query('start');
+        $endParam = $request->query('end');
+
+        if ($startParam && $endParam) {
+            $start = Carbon::parse($startParam)->setTimezone('Asia/Jakarta');
+            $end = Carbon::parse($endParam)->setTimezone('Asia/Jakarta');
+        } else {
+            $start = Carbon::now('Asia/Jakarta')->subHours(12);
+            $end = Carbon::now('Asia/Jakarta');
+        }
+
         $device = Device::findOrFail($deviceId);
 
         $phases = $this->getReconstructedPhases($deviceId, $start, $end);

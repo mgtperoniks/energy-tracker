@@ -667,9 +667,10 @@
 
             if (end <= start) return alert('End time must be after Start time.');
 
-            // Limit to 24H for performance safety
-            if ((end - start) > (24 * 60 * 60 * 1000)) {
-                if (!confirm('Range exceeds 24H. This may affect terminal performance. Continue?')) return;
+            // Limit to 90 days
+            if ((end - start) > (90 * 24 * 60 * 60 * 1000)) {
+                alert('Maximum historical range is 90 days');
+                return;
             }
 
             safeFetch(`{{ url('api/charts/device') }}?device_id=${deviceId}&start_date=${start.toISOString()}&end_date=${end.toISOString()}`)
@@ -681,6 +682,10 @@
                         console.error('Telemetry payload is not array', cachedData);
                         return;
                     }
+
+                    // Sync visual range to allow rendering of historical datasets
+                    visualRange.min = start.getTime();
+                    visualRange.max = end.getTime();
 
                     renderChart(cachedData);
                     

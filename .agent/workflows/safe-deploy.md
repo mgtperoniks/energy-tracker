@@ -83,7 +83,7 @@ sudo docker compose exec app php artisan migrate --force
 
 ```bash
 # ❌ JANGAN! Ini menghapus SEMUA data!
-php artisan migrate:fresh
+php artisan migrate:fresh--xx
 php artisan migrate:fresh --seed
 php artisan migrate:rollback
 php artisan db:wipe

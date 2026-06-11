@@ -226,6 +226,9 @@
                 <a href="{{ route('analytics.accounting') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.accounting') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     Accounting Report
                 </a>
+                <a href="{{ route('analytics.historian') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.historian') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
+                    Production Historian
+                </a>
                 <a href="{{ route('analytics.audit') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.audit') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
                     System Audit Trail
                 </a>
