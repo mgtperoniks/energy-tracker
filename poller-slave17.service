@@ -1,0 +1,17 @@
+[Unit]
+Description=Modbus TCP Poller for Furnace (Slave 17)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/docker/apps/energy-tracker
+EnvironmentFile=/srv/docker/apps/energy-tracker/.env.slave17
+ExecStart=/usr/bin/python3 /srv/docker/apps/energy-tracker/modbus_poller.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/poller-slave17.log
+StandardError=append:/var/log/poller-slave17.log
+
+[Install]
+WantedBy=multi-user.target
