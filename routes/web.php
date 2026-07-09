@@ -39,6 +39,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/audit/export', [\App\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
         Route::get('/tagging-audit', [\App\Http\Controllers\TaggingAuditController::class, 'index'])->name('tagging-audit');
         Route::get('/historian', [\App\Http\Controllers\ProductionHistorianController::class, 'index'])->name('historian');
+        Route::post('/historian/production-results', [\App\Http\Controllers\ProductionHistorianController::class, 'storeProductionResult'])->name('historian.store_production');
+        Route::get('/historian/export', [\App\Http\Controllers\ProductionHistorianController::class, 'exportExcel'])->name('historian.export');
+        Route::get('/historian/pdf', [\App\Http\Controllers\ProductionHistorianController::class, 'exportPdf'])->name('historian.pdf');
     });
 
     // 4. ASSETS

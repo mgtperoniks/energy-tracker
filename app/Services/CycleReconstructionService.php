@@ -59,6 +59,13 @@ class CycleReconstructionService
             return [];
         }
 
+        // Q5: Bulk query for production results (Actual Output & Return Material)
+        // DILARANG melakukan query per-row. Seluruh data production_result diambil menggunakan SATU bulk query.
+        $meltingIds = $meltings->pluck('id')->toArray();
+        $productionResults = \App\Models\ProductionCycleResult::whereIn('melting_tag_id', $meltingIds)
+            ->get()
+            ->keyBy('melting_tag_id');
+
         $cycles      = [];
         $cycleNumber = 0;
 
@@ -107,6 +114,12 @@ class CycleReconstructionService
                 $pourTagId = $pour->id;
             }
 
+            // Fetch production result for this cycle from bulk collection
+            $prod = $productionResults->get($meltingTag->id);
+            $actualOutputKg = $prod ? $prod->actual_output_kg : null;
+            $returnMaterialKg = $prod ? $prod->return_material_kg : null;
+            $remark = $prod ? $prod->remark : null;
+
             $cycles[] = [
                 // Identity
                 'number'                 => $cycleNum,
@@ -126,6 +139,11 @@ class CycleReconstructionService
                 // Energy & Cost
                 'kwh'                    => round($kwh, 3),
                 'est_cost'               => $estCost,
+
+                // Production Results
+                'actual_output_kg'       => $actualOutputKg,
+                'return_material_kg'     => $returnMaterialKg,
+                'remark'                 => $remark,
 
                 // Status (may be mutated to OUTLIER by detectOutliers)
                 'status'                 => $status,

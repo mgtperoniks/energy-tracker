@@ -22,6 +22,11 @@ class OperationalEventTag extends Model
         return $this->belongsTo(Device::class);
     }
 
+    public function productionResult()
+    {
+        return $this->hasOne(ProductionCycleResult::class, 'melting_tag_id');
+    }
+
     public function tagger()
     {
         return $this->belongsTo(User::class, 'tagged_by');
