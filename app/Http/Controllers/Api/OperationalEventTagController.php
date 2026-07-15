@@ -87,8 +87,19 @@ class OperationalEventTagController extends Controller
                 return ['status' => 'INVALID', 'message' => 'Cannot repeat the same event type consecutively.'];
             }
 
-            if ($eventType === 'pour' && !in_array($previousTag->event_type, ['melting', 'test'])) {
-                if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'Pour event typically follows melting or test. This breaks the expected sequence.'];
+            if ($eventType === 'pour') {
+                $logicalPrevQuery = OperationalEventTag::where('device_id', $deviceId)
+                    ->where('event_time', '<', $eventTimeStr)
+                    ->whereNotIn('event_type', ['downtime', 'start'])
+                    ->whereNull('deleted_at');
+                if ($excludeId) {
+                    $logicalPrevQuery->where('id', '!=', $excludeId);
+                }
+                $logicalPrevTag = $logicalPrevQuery->orderBy('event_time', 'desc')->first();
+
+                if (!$logicalPrevTag || !in_array($logicalPrevTag->event_type, ['melting', 'test'])) {
+                    if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'Pour event typically follows melting or test. This breaks the expected sequence.'];
+                }
             }
 
             if ($previousTag->event_type === 'end' && $eventType !== 'start') {
@@ -101,7 +112,7 @@ class OperationalEventTagController extends Controller
                 return ['status' => 'INVALID', 'message' => 'Cannot repeat the same event type consecutively with the next tag.'];
             }
 
-            if ($nextTag->event_type === 'pour' && !in_array($eventType, ['melting', 'test'])) {
+            if ($nextTag->event_type === 'pour' && !in_array($eventType, ['melting', 'test', 'start', 'downtime'])) {
                 if (!$force) return ['status' => 'VALID_WITH_WARNING', 'message' => 'The next event is pour, which typically follows melting or test. This breaks the expected sequence.'];
             }
 
@@ -120,7 +131,7 @@ class OperationalEventTagController extends Controller
         }
 
         $validated = $request->validate([
-            'event_type' => 'required|in:start,melting,idle,test,pour,end',
+            'event_type' => 'required|in:start,melting,idle,test,pour,end,downtime',
             'event_time' => 'required|date',
             'notes' => 'nullable|string',
             'shift' => 'nullable|string',
@@ -171,7 +182,7 @@ class OperationalEventTagController extends Controller
         }
 
         $validated = $request->validate([
-            'event_type' => 'required|in:start,melting,idle,test,pour,end',
+            'event_type' => 'required|in:start,melting,idle,test,pour,end,downtime',
             'event_time' => 'required|date',
             'notes' => 'nullable|string',
             'shift' => 'nullable|string',
@@ -296,6 +307,7 @@ class OperationalEventTagController extends Controller
                 'test' => 'Testing',
                 'pour' => 'Pouring',
                 'end' => 'Finished',
+                'downtime' => 'Downtime',
                 default => 'Unknown'
             };
         };

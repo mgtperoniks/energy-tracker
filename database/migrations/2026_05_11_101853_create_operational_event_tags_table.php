@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('device_id')->constrained()->cascadeOnDelete();
             $table->foreignId('tagged_by')->constrained('users');
-            $table->enum('event_type', ['start', 'melting', 'idle', 'test', 'pour', 'end']);
+            $table->enum('event_type', ['start', 'melting', 'idle', 'test', 'pour', 'end', 'downtime']);
             $table->timestamp('event_time');
             $table->text('notes')->nullable();
             $table->string('shift')->nullable();

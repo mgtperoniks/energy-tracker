@@ -303,12 +303,11 @@
                             Type</label>
                         <select id="tag-event-type"
                             class="w-full bg-white text-xs px-2 py-1.5 rounded font-bold text-on-surface outline-none border border-surface-container focus:border-primary">
-                            <option value="start">Start (Furnace/Process starts)</option>
-                            <option value="melting">Melting (Active heating)</option>
-                            <option value="idle">Idle (Waiting/Hold condition)</option>
-                            <option value="test">Test (Spectro/Quality check)</option>
-                            <option value="pour">Pour (Pouring/Tapping process)</option>
-                            <option value="end">End (Production finished)</option>
+                            <option value="start" id="option-start">Start (Furnace/Process starts)</option>
+                            <option value="melting" id="option-melting">Melting (Active heating)</option>
+                            <option value="downtime" id="option-downtime">Downtime</option>
+                            <option value="pour" id="option-pour">Pour (Pouring/Tapping process)</option>
+                            <option value="end" id="option-end">End (Production finished)</option>
                         </select>
                     </div>
 
@@ -1052,8 +1051,22 @@
             const notesField = document.getElementById('tag-notes');
             const deleteBtn = document.getElementById('btn-delete-tag');
 
+            // Check active downtime status from currentTags
+            const activeTags = currentTags.filter(t => !t.deleted_at);
+            const sortedActiveTags = [...activeTags].sort((a, b) => new Date(b.event_time) - new Date(a.event_time));
+            const latestTag = sortedActiveTags.length > 0 ? sortedActiveTags[0] : null;
+            const isDowntimeActive = latestTag && latestTag.event_type === 'downtime';
+
+            const optionMelting = document.getElementById('option-melting');
+            const optionPour = document.getElementById('option-pour');
+            const optionStart = document.getElementById('option-start');
+
             if (tagData) {
                 idField.value = tagData.id;
+                // Temporarily show all options when editing an existing tag
+                if (optionMelting) { optionMelting.style.display = 'block'; optionMelting.disabled = false; }
+                if (optionPour) { optionPour.style.display = 'block'; optionPour.disabled = false; }
+                if (optionStart) { optionStart.textContent = 'Start (Furnace/Process starts)'; }
                 typeField.value = tagData.event_type;
                 shiftField.value = tagData.shift || '1';
                 notesField.value = tagData.notes || '';
@@ -1063,10 +1076,21 @@
                 }
             } else {
                 idField.value = '';
-                typeField.value = 'start';
                 shiftField.value = '1';
                 notesField.value = '';
                 if (deleteBtn) deleteBtn.classList.add('hidden');
+
+                if (isDowntimeActive) {
+                    if (optionMelting) { optionMelting.style.display = 'none'; optionMelting.disabled = true; }
+                    if (optionPour) { optionPour.style.display = 'none'; optionPour.disabled = true; }
+                    if (optionStart) { optionStart.textContent = 'Start (Resume)'; }
+                    typeField.value = 'start';
+                } else {
+                    if (optionMelting) { optionMelting.style.display = 'block'; optionMelting.disabled = false; }
+                    if (optionPour) { optionPour.style.display = 'block'; optionPour.disabled = false; }
+                    if (optionStart) { optionStart.textContent = 'Start (Furnace/Process starts)'; }
+                    typeField.value = 'start';
+                }
             }
 
             tagModal.classList.remove('hidden');
@@ -1223,7 +1247,8 @@
                 pour: 'rgba(33, 150, 243, 0.12)',      // POURING
                 idle: 'rgba(158, 158, 158, 0.10)',     // IDLE
                 test: 'rgba(158, 158, 158, 0.10)',     // TEST (using IDLE color)
-                end: 'rgba(244, 67, 54, 0.10)'         // END
+                end: 'rgba(244, 67, 54, 0.10)',         // END
+                downtime: 'rgba(107, 114, 128, 0.12)'   // DOWNTIME
             };
             return c[type] || 'rgba(158, 158, 158, 0.05)';
         }
@@ -1321,7 +1346,7 @@
         }
 
         function getEventColor(type) {
-            const c = { start: '#10b981', melting: '#f97316', idle: '#94a3b8', test: '#eab308', pour: '#3b82f6', end: '#ef4444' };
+            const c = { start: '#10b981', melting: '#f97316', idle: '#94a3b8', test: '#eab308', pour: '#3b82f6', end: '#ef4444', downtime: '#6b7280' };
             return c[type] || '#94a3b8';
         }
 

@@ -75,13 +75,26 @@ class CycleReconstructionService
 
             $cycleStart = Carbon::parse($meltingTag->event_time)->setTimezone('Asia/Jakarta');
 
-            // Determine cycle boundary end and initial status
-            if ($nextMelting) {
+            // Find any end tag strictly after cycleStart and before nextMelting (or end of window)
+            $endTag = $tags->first(function ($t) use ($cycleStart, $nextMelting, $end) {
+                if ($t->event_type !== 'end') return false;
+                $tTime = Carbon::parse($t->event_time);
+                if ($nextMelting) {
+                    return $tTime->gt($cycleStart) && $tTime->lt(Carbon::parse($nextMelting->event_time));
+                }
+                return $tTime->gt($cycleStart) && $tTime->lte($end);
+            });
+
+            // Determine cycle boundary end
+            if ($endTag) {
+                $cycleEnd      = Carbon::parse($endTag->event_time)->setTimezone('Asia/Jakarta');
+                $isEnded       = true;
+            } elseif ($nextMelting) {
                 $cycleEnd      = Carbon::parse($nextMelting->event_time)->setTimezone('Asia/Jakarta');
-                $initialStatus = 'CLOSED';
+                $isEnded       = true;
             } else {
                 $cycleEnd      = $end->copy()->setTimezone('Asia/Jakarta');
-                $initialStatus = 'OPEN';
+                $isEnded       = false;
             }
 
             // Find first pour strictly between cycleStart and cycleEnd
@@ -93,17 +106,29 @@ class CycleReconstructionService
             $totalMinutes = max(0, (int) $cycleStart->diffInMinutes($cycleEnd));
 
             if ($pour === null) {
-                // No pour between two consecutive meltings → INCOMPLETE
-                $status         = 'INCOMPLETE';
+                // No pour between boundary
+                // Check if downtime occurred during this cycle
+                $hasDowntime = $tags->contains(function ($t) use ($cycleStart, $cycleEnd) {
+                    return $t->event_type === 'downtime' &&
+                        Carbon::parse($t->event_time)->gt($cycleStart) &&
+                        Carbon::parse($t->event_time)->lt($cycleEnd);
+                });
+
+                if ($isEnded) {
+                    $status = $hasDowntime ? 'ABORTED' : 'INCOMPLETE';
+                } else {
+                    $status = 'OPEN';
+                }
+
                 $pouringStart   = null;
                 $meltingMinutes = $totalMinutes;
                 $pouringMinutes = 0;
                 $kwh            = 0.0;
                 $estCost        = 0.0;
-                $cycleNum       = null;   // INCOMPLETE has no sequence number
+                $cycleNum       = null;   // INCOMPLETE/ABORTED has no sequence number
                 $pourTagId      = null;
             } else {
-                $status         = $initialStatus;
+                $status         = 'CLOSED';
                 $pouringStart   = Carbon::parse($pour->event_time)->setTimezone('Asia/Jakarta');
                 $meltingMinutes = max(0, (int) $cycleStart->diffInMinutes($pouringStart));
                 $pouringMinutes = max(0, (int) $pouringStart->diffInMinutes($cycleEnd));
@@ -183,7 +208,7 @@ class CycleReconstructionService
         $closed     = array_values(array_filter($cycles, fn($c) => $c['status'] === 'CLOSED'));
         $outliers   = array_values(array_filter($cycles, fn($c) => $c['status'] === 'OUTLIER'));
         $open       = array_values(array_filter($cycles, fn($c) => $c['status'] === 'OPEN'));
-        $incomplete = array_values(array_filter($cycles, fn($c) => $c['status'] === 'INCOMPLETE'));
+        $incomplete = array_values(array_filter($cycles, fn($c) => $c['status'] === 'INCOMPLETE' || $c['status'] === 'ABORTED'));
 
         // OUTLIER is a flagged CLOSED — combine for "completed" aggregates
         $completed    = array_merge($closed, $outliers);
@@ -342,7 +367,7 @@ class CycleReconstructionService
         return OperationalEventTag::where('device_id', $deviceId)
             ->where('event_time', '>=', $windowStart->toDateTimeString())
             ->where('event_time', '<=', $end->toDateTimeString())
-            ->whereIn('event_type', ['melting', 'pour'])
+            ->whereIn('event_type', ['start', 'melting', 'idle', 'test', 'pour', 'end', 'downtime'])
             ->whereNull('deleted_at')
             ->orderBy('event_time', 'asc')
             ->get(['id', 'event_type', 'event_time']);
