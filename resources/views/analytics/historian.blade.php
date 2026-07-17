@@ -327,7 +327,7 @@
                                         @if($cycle['return_material_kg'] !== null)
                                             @php
                                                 $returnVal = $cycle['return_material_kg'];
-                                                $returnColor = $returnVal <= 20 ? 'text-green-600 dark:text-green-400' : ($returnVal <= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400');
+                                                $returnColor = $returnVal < 200 ? 'text-green-600 dark:text-green-400' : ($returnVal < 300 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400');
                                             @endphp
                                             <span class="{{ $returnColor }} font-bold">{{ number_format($returnVal, 2) }}</span>
                                         @else
@@ -480,10 +480,10 @@
 
                 <div>
                     <label for="return_material_kg" class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Bahan Kembali (kg) *</label>
-                    <input type="number" step="0.01" name="return_material_kg" id="form_return_material_kg" min="0" max="200"
+                    <input type="number" step="0.01" name="return_material_kg" id="form_return_material_kg" min="0" max="600"
                            class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                           placeholder="Masukkan bahan kembali (0 - 200)">
-                    <p class="text-[9px] text-outline mt-1">Validasi: Min 0 kg, Max 200 kg. Kosongkan jika tidak ada return.</p>
+                           placeholder="Masukkan bahan kembali (0 - 600)">
+                    <p class="text-[9px] text-outline mt-1">Validasi: Min 0 kg, Max 600 kg. Kosongkan jika tidak ada return.</p>
                 </div>
 
                 <div>

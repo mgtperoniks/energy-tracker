@@ -137,7 +137,7 @@ class ProductionHistorianController extends Controller
         $validated = $request->validate([
             'melting_tag_id'     => 'required|exists:operational_event_tags,id',
             'actual_output_kg'   => 'nullable|numeric|min:0|max:600',
-            'return_material_kg' => 'nullable|numeric|min:0|max:200',
+            'return_material_kg' => 'nullable|numeric|min:0|max:600',
             'remark'             => 'nullable|string|max:1000',
         ]);
 

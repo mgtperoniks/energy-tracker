@@ -100,14 +100,111 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+
+        /* Collapsible Sidebar Styles */
+        aside, main {
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @media (min-width: 768px) {
+            body.sidebar-collapsed aside {
+                width: 72px !important;
+            }
+            body.sidebar-collapsed main {
+                margin-left: 72px !important;
+            }
+            body.sidebar-collapsed .logo-full {
+                display: none !important;
+            }
+            body.sidebar-collapsed .logo-compact {
+                display: inline-block !important;
+            }
+            body.sidebar-collapsed aside .sidebar-text,
+            body.sidebar-collapsed aside .sidebar-arrow,
+            body.sidebar-collapsed aside .sidebar-header-info h2,
+            body.sidebar-collapsed aside .sidebar-header-info span.text-xs {
+                display: none !important;
+            }
+            body.sidebar-collapsed aside .sidebar-header-info {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                margin-bottom: 0.5rem;
+            }
+            body.sidebar-collapsed aside .sidebar-status-container {
+                justify-content: center !important;
+                margin-top: 0.25rem;
+            }
+            body.sidebar-collapsed aside nav {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                overflow: visible !important;
+            }
+            body.sidebar-collapsed aside nav a,
+            body.sidebar-collapsed aside nav summary {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                justify-content: center !important;
+            }
+            body.sidebar-collapsed aside details > div {
+                display: none !important;
+            }
+            body.sidebar-collapsed aside nav div.pt-2\.5 {
+                border-top: 1px solid rgba(226, 232, 240, 0.15);
+                margin: 0.75rem 0;
+                padding: 0 !important;
+            }
+            body.sidebar-collapsed aside nav div.pt-2\.5 p {
+                display: none !important;
+            }
+
+            .sidebar-link-item {
+                position: relative;
+            }
+            body.sidebar-collapsed .sidebar-link-item::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                left: 100%;
+                top: 50%;
+                transform: translateY(-50%) translateX(10px);
+                background: #0f172a;
+                color: #f1f5f9;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 5px 10px;
+                border-radius: 4px;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.15s ease, transform 0.15s ease;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                z-index: 9999;
+            }
+            body.sidebar-collapsed .sidebar-link-item:hover::after {
+                opacity: 1;
+                transform: translateY(-50%) translateX(15px);
+            }
+        }
     </style>
 </head>
 <body class="bg-surface text-on-surface antialiased font-body selection:bg-primary-container selection:text-white">
+<script>
+    if (localStorage.getItem('sidebar-state') === 'collapsed') {
+        document.body.classList.add('sidebar-collapsed');
+    }
+</script>
 
 <!-- TopNavBar -->
 <header class="fixed top-0 w-full z-50 bg-gradient-to-r from-sky-700 to-sky-900 dark:from-sky-900 dark:to-slate-950 text-white shadow-lg flex items-center justify-between px-6 h-16 transition-all antialiased">
-    <div class="flex items-center gap-4 md:gap-8">
-        <span class="text-xl font-bold tracking-tight uppercase"><a href="{{ route('dashboard') }}">Energy Tracker</a></span>
+    <div class="flex items-center gap-4 md:gap-6">
+        <button id="sidebar-toggle-btn" class="hidden md:flex p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors mr-1 outline-none" title="Toggle Sidebar">
+            <span class="material-symbols-outlined text-[20px]" id="sidebar-toggle-icon">menu_open</span>
+        </button>
+        <span class="text-xl font-bold tracking-tight uppercase">
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
+                <span class="logo-full">Energy Tracker</span>
+                <span class="logo-compact hidden">ET</span>
+            </a>
+        </span>
     </div>
     <div class="flex items-center gap-4">
         <div class="relative group hidden sm:block border-l border-white/10 pl-4">
@@ -151,13 +248,13 @@
     </div>
 </header>
 
-<!-- SideNavBar -->
-<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col py-2.5 z-40">
-    <div class="px-6 mb-3.5">
-        <h2 class="text-sky-700 dark:text-sky-400 font-bold uppercase tracking-widest text-[10px]">Industrial Site A</h2>
-        <div class="flex items-center gap-2 mt-0.5">
-            <span class="w-2 h-2 rounded-full bg-secondary"></span>
-            <span class="text-slate-500 dark:text-slate-400 text-xs font-medium">Active Monitor</span>
+<!<!-- SideNavBar -->
+<aside id="app-sidebar" class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col py-2.5 z-40">
+    <div class="px-6 mb-3.5 sidebar-header-info">
+        <h2 class="text-sky-700 dark:text-sky-400 font-bold uppercase tracking-widest text-[10px] sidebar-text">Industrial Site A</h2>
+        <div class="flex items-center gap-2 mt-0.5 sidebar-status-container">
+            <span class="w-2 h-2 rounded-full bg-secondary shrink-0"></span>
+            <span class="text-slate-500 dark:text-slate-400 text-xs font-medium sidebar-text">Active Monitor</span>
         </div>
     </div>
     
@@ -167,9 +264,9 @@
 
     <nav class="flex-1 px-3 space-y-0.5 overflow-y-auto custom-scrollbar pb-4">
         <!-- 1. OVERVIEW -->
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'dashboard') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('dashboard') }}">
+        <a data-tooltip="Overview" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'dashboard') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('dashboard') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">dashboard</span>
-            <span>Overview</span>
+            <span class="sidebar-text">Overview</span>
         </a>
 
         <!-- 2. MONITORING -->
@@ -183,10 +280,10 @@
         @endphp
 
         <details class="group" @if($isMonitoringOpen) open @endif>
-            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'monitoring.meters')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+            <summary data-tooltip="Power Meters" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'monitoring.meters')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
                 <span class="material-symbols-outlined text-[20px] shrink-0">electric_meter</span>
-                <span class="flex-1 truncate">Power Meters</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
+                <span class="flex-1 truncate sidebar-text">Power Meters</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0 sidebar-arrow">expand_more</span>
             </summary>
             <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1 max-h-[320px] overflow-y-auto custom-scrollbar">
                 @foreach($sidebarMeters as $meter)
@@ -200,13 +297,13 @@
             </div>
         </details>
         
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.environmental') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.environmental') }}">
+        <a data-tooltip="Environmental" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.environmental') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.environmental') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">thermostat</span>
-            <span>Environmental</span>
+            <span class="sidebar-text">Environmental</span>
         </a>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.health') }}">
+        <a data-tooltip="System Health" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'monitoring.health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('monitoring.health') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">monitor_heart</span>
-            <span>System Health</span>
+            <span class="sidebar-text">System Health</span>
         </a>
 
         <!-- 3. ANALYTICS -->
@@ -214,10 +311,10 @@
             <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Analytics</p>
         </div>
         <details class="group" @if(Str::startsWith($currentRouteName, 'analytics.')) open @endif>
-            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'analytics.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+            <summary data-tooltip="Reports" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'analytics.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
                 <span class="material-symbols-outlined text-[20px] shrink-0">analytics</span>
-                <span class="flex-1 truncate">Reports</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
+                <span class="flex-1 truncate sidebar-text">Reports</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0 sidebar-arrow">expand_more</span>
             </summary>
             <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1">
                 <a href="{{ route('analytics.operational') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'analytics.operational') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
@@ -243,10 +340,10 @@
             <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Assets</p>
         </div>
         <details class="group" @if(Str::startsWith($currentRouteName, 'assets.')) open @endif>
-            <summary class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'assets.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
+            <summary data-tooltip="Asset Management" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all cursor-pointer list-none @if(Str::startsWith($currentRouteName, 'assets.')) text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif">
                 <span class="material-symbols-outlined text-[20px] shrink-0">inventory_2</span>
-                <span class="flex-1 truncate">Asset Management</span>
-                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0">expand_more</span>
+                <span class="flex-1 truncate sidebar-text">Asset Management</span>
+                <span class="material-symbols-outlined transform transition-transform group-open:rotate-180 text-xs shrink-0 sidebar-arrow">expand_more</span>
             </summary>
             <div class="mt-0.5 flex flex-col gap-y-0.5 border-l-2 border-slate-200 dark:border-slate-700 ml-4.5 pl-1.5 py-1">
                 <a href="{{ route('assets.machines') }}" class="flex items-center text-[10.5px] px-2 py-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors @if($currentRouteName == 'assets.machines') text-sky-700 dark:text-sky-400 font-bold bg-sky-100/50 dark:bg-sky-900/30 @else text-slate-600 dark:text-slate-400 font-medium @endif">
@@ -265,37 +362,36 @@
         <div class="pt-2.5 pb-0.5">
             <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">Administration</p>
         </div>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.tariffs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.tariffs') }}">
+        <a data-tooltip="Tariff Management" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.tariffs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.tariffs') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">payments</span>
-            <span>Tariff Management</span>
+            <span class="sidebar-text">Tariff Management</span>
         </a>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.thresholds') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.thresholds') }}">
+        <a data-tooltip="Threshold Settings" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.thresholds') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.thresholds') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">tune</span>
-            <span>Threshold Settings</span>
+            <span class="sidebar-text">Threshold Settings</span>
         </a>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.device-config') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.device-config') }}">
+        <a data-tooltip="Device Config" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.device-config') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.device-config') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">settings_input_component</span>
-            <span>Device Config</span>
+            <span class="sidebar-text">Device Config</span>
         </a>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.poller-logs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.poller-logs') }}">
+        <a data-tooltip="Poller Logs" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.poller-logs') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.poller-logs') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">list_alt</span>
-            <span>Poller Logs</span>
+            <span class="sidebar-text">Poller Logs</span>
         </a>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.reset-history') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.reset-history') }}">
+        <a data-tooltip="Reset History" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.reset-history') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.reset-history') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">history</span>
-            <span>Reset History</span>
+            <span class="sidebar-text">Reset History</span>
         </a>
 
         <div class="pt-2.5 pb-0.5">
             <p class="px-4 text-[9px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">System Deployment</p>
         </div>
-        <a class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.deployment-health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.deployment-health') }}">
+        <a data-tooltip="Deployment Health" class="sidebar-link-item flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] leading-tight transition-all @if($currentRouteName == 'admin.deployment-health') text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-900/20 @else text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 @endif" href="{{ route('admin.deployment-health') }}">
             <span class="material-symbols-outlined text-[20px] shrink-0">health_and_safety</span>
-            <span>Deployment Health</span>
+            <span class="sidebar-text">Deployment Health</span>
         </a>
 
     </nav>
-
 </aside>
 
 <!-- Main Content Area -->
@@ -350,7 +446,7 @@
     }
 
     function markReadAndGo(id, url) {
-        fetch(`/api/notifications/${id}/read`, {
+        fetch(`{{ url('api/notifications') }}/${id}/read`, {
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
         }).then(() => {
@@ -384,6 +480,30 @@
     window.addEventListener('click', function(e) {
         if (!document.getElementById('notification-root').contains(e.target)) {
             document.getElementById('notif-dropdown').classList.add('hidden');
+        }
+    });
+
+    // Sidebar Collapse Toggle logic
+    document.addEventListener('DOMContentLoaded', function () {
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+        const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
+        
+        const updateIconState = () => {
+            if (document.body.classList.contains('sidebar-collapsed')) {
+                if (sidebarToggleIcon) sidebarToggleIcon.textContent = 'menu';
+            } else {
+                if (sidebarToggleIcon) sidebarToggleIcon.textContent = 'menu_open';
+            }
+        };
+        updateIconState();
+        
+        if (sidebarToggleBtn) {
+            sidebarToggleBtn.addEventListener('click', function () {
+                document.body.classList.toggle('sidebar-collapsed');
+                const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+                localStorage.setItem('sidebar-state', isCollapsed ? 'collapsed' : 'expanded');
+                updateIconState();
+            });
         }
     });
 </script>

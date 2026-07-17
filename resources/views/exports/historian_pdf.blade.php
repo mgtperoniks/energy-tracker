@@ -93,9 +93,9 @@
         .status-incomplete { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
         .status-outlier { background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
 
-        /* Color Indicators */
         .color-green { color: #16a34a; font-weight: bold; }
         .color-yellow { color: #ca8a04; font-weight: bold; }
+        .color-orange { color: #ea580c; font-weight: bold; }
         .color-red { color: #dc2626; font-weight: bold; }
 
         .footer {
@@ -188,7 +188,7 @@
                         @if($cycle['return_material_kg'] !== null)
                             @php
                                 $returnVal = $cycle['return_material_kg'];
-                                $returnClass = $returnVal <= 20 ? 'color-green' : ($returnVal <= 50 ? 'color-yellow' : 'color-red');
+                                $returnClass = $returnVal < 200 ? 'color-green' : ($returnVal < 300 ? 'color-orange' : 'color-red');
                             @endphp
                             <span class="{{ $returnClass }}">{{ number_format($returnVal, 2) }}</span>
                         @else

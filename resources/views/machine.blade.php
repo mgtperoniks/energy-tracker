@@ -1100,7 +1100,7 @@
 
         window.saveTag = function () {
             const id = document.getElementById('tag-id').value;
-            const url = id ? `/api/tags/${id}` : `/api/machines/${deviceId}/tags`;
+            const url = id ? `{{ url('api/tags') }}/${id}` : `{{ url('api/machines') }}/${deviceId}/tags`;
             const method = id ? 'PUT' : 'POST';
 
             // Patch 7: Store Raw ISO Timestamp internally
@@ -1142,7 +1142,7 @@
                 return alert('Forensic reason must be at least 10 characters.');
             }
 
-            safeFetch(`/api/tags/${id}`, {
+            safeFetch(`{{ url('api/tags') }}/${id}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ reason: reason })
             })
