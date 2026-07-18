@@ -87,6 +87,27 @@ class OperationalEventTagController extends Controller
                 return ['status' => 'INVALID', 'message' => 'Cannot repeat the same event type consecutively.'];
             }
 
+            // Business Rule: DOWNTIME cannot be recorded after a completed pouring phase.
+            // Find the last meaningful tag (excluding 'start') to determine whether
+            // a pour has already occurred in the current cycle boundary.
+            if ($eventType === 'downtime') {
+                $lastMeaningfulQuery = OperationalEventTag::where('device_id', $deviceId)
+                    ->where('event_time', '<', $eventTimeStr)
+                    ->whereNotIn('event_type', ['start'])
+                    ->whereNull('deleted_at');
+                if ($excludeId) {
+                    $lastMeaningfulQuery->where('id', '!=', $excludeId);
+                }
+                $lastMeaningfulTag = $lastMeaningfulQuery->orderBy('event_time', 'desc')->first();
+
+                if ($lastMeaningfulTag && $lastMeaningfulTag->event_type === 'pour') {
+                    return [
+                        'status'  => 'INVALID',
+                        'message' => 'Downtime cannot be recorded after a completed pouring phase.',
+                    ];
+                }
+            }
+
             if ($eventType === 'pour') {
                 $logicalPrevQuery = OperationalEventTag::where('device_id', $deviceId)
                     ->where('event_time', '<', $eventTimeStr)
