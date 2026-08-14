@@ -7,12 +7,12 @@ and inserts readings into the Laravel energy_tracker database.
 
 Follows the same pattern as modbus_poller.py.
 
-Configuration via environment variables:
+Configuration via environment variables or Laravel's .env:
   DB_HOST                      MySQL host          (default: 127.0.0.1)
   DB_PORT                      MySQL port          (default: 3306)
   DB_DATABASE                  MySQL database      (default: energy_tracker)
   DB_USERNAME                  MySQL user          (default: root)
-  DB_PASSWORD                  MySQL password      (default: 123456788)
+  DB_PASSWORD                  MySQL password      (default: loaded from .env)
   ENVIRONMENTAL_POLL_INTERVAL  Poll interval sec   (default: 900)
 """
 
@@ -23,6 +23,23 @@ import struct
 import pymysql
 from datetime import datetime
 
+# Load Laravel's .env file if it exists to get DB credentials dynamically
+def load_dotenv():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                parts = line.split('=', 1)
+                k = parts[0].strip()
+                v = parts[1].strip().strip('"').strip("'")
+                if k not in os.environ:
+                    os.environ[k] = v
+
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # CONFIGURATION (via environment variables - same pattern as modbus_poller.py)
 # ---------------------------------------------------------------------------
@@ -30,7 +47,7 @@ DB_HOST       = os.getenv("DB_HOST",     "127.0.0.1")
 DB_PORT       = int(os.getenv("DB_PORT", 3306))
 DB_NAME       = os.getenv("DB_DATABASE", "energy_tracker")
 DB_USER       = os.getenv("DB_USERNAME", "root")
-DB_PASS       = os.getenv("DB_PASSWORD", "123456788")
+DB_PASS       = os.getenv("DB_PASSWORD", "")
 POLL_INTERVAL = int(os.getenv("ENVIRONMENTAL_POLL_INTERVAL", 900))
 
 MODBUS_TIMEOUT = 3.0
