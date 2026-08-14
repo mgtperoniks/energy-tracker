@@ -1,0 +1,17 @@
+[Unit]
+Description=Modbus TCP Poller for Bubut Besi (Slave 11)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/docker/apps/energy-tracker
+EnvironmentFile=/srv/docker/apps/energy-tracker/.env.slave11
+ExecStart=/usr/bin/python3 /srv/docker/apps/energy-tracker/modbus_poller.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/poller-slave11.log
+StandardError=append:/var/log/poller-slave11.log
+
+[Install]
+WantedBy=multi-user.target
