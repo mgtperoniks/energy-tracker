@@ -1,0 +1,16 @@
+[Unit]
+Description=Environmental Telemetry Poller (SHT40)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/docker/apps/energy-tracker
+ExecStart=/usr/bin/python3 /srv/docker/apps/energy-tracker/environmental_poller.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/environmental-poller.log
+StandardError=append:/var/log/environmental-poller.log
+
+[Install]
+WantedBy=multi-user.target
