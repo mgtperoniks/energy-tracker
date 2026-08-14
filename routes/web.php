@@ -19,7 +19,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/meters/{id?}', [\App\Http\Controllers\MachineDashboardController::class, 'show'])->name('meters');
         Route::get('/meters/{id}/export', [\App\Http\Controllers\MachineDashboardController::class, 'export'])->name('meters.export');
         // Placeholder to prevent RouteNotFoundException in navigation
-        Route::get('/environmental', function() { abort(404, 'Environmental Monitoring Module not installed.'); })->name('environmental');
+        Route::get('/environmental', [\App\Http\Controllers\EnvironmentalController::class, 'index'])->name('environmental');
+        Route::get('/environmental/export/excel', [\App\Http\Controllers\EnvironmentalController::class, 'exportExcel'])->name('environmental.export.excel');
+        Route::get('/environmental/export/pdf', [\App\Http\Controllers\EnvironmentalController::class, 'exportPdf'])->name('environmental.export.pdf');
         Route::get('/system-health', [\App\Http\Controllers\SystemHealthController::class, 'index'])->name('health');
     });
 
@@ -104,3 +106,4 @@ Route::middleware('auth')->group(function () {
 Route::get('/machines/{id}', function ($id) {
     return redirect()->route('monitoring.meters', ['id' => $id]);
 });
+
