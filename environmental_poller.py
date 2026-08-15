@@ -68,6 +68,17 @@ SENSORS = [
         "quantity":  2,
     },
     {
+        "name":      "SHT40 Lab 2 (USR 10.88.8.17)",
+        "device_id": 29,
+        "host":      "10.88.8.17",
+        "port":      502,
+        "protocol":  "tcp",
+        "slave_id":  53,
+        "fc":        0x04,
+        "start_reg": 0x0001,
+        "quantity":  2,
+    },
+    {
         "name":      "SHT40 Field (USR 10.88.8.20)",
         "device_id": 28,
         "host":      "10.88.8.20",

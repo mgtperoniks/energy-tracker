@@ -61,5 +61,31 @@ class EnvironmentalDevicesSeeder extends Seeder
             $d28->api_token = Str::random(60);
             $d28->save();
         }
+
+        // 3. Provision Device 29 (SHT40 Lab 2)
+        $d29 = Device::find(29);
+        if ($d29) {
+            // Update existing record
+            $d29->name = 'SHT40 Lab 2';
+            $d29->type = 'temperature_sensor';
+            $d29->slave_id = 53;
+            $d29->communication_type = 'TCP';
+            $d29->status = 1;
+            if (empty($d29->api_token)) {
+                $d29->api_token = Str::random(60);
+            }
+            $d29->save();
+        } else {
+            // Create new record with ID 29
+            $d29 = new Device();
+            $d29->id = 29;
+            $d29->name = 'SHT40 Lab 2';
+            $d29->type = 'temperature_sensor';
+            $d29->slave_id = 53;
+            $d29->communication_type = 'TCP';
+            $d29->status = 1;
+            $d29->api_token = Str::random(60);
+            $d29->save();
+        }
     }
 }
