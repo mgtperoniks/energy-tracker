@@ -1,0 +1,12 @@
+.git/
+.gitignore
+.env
+.env.*
+storage/
+node_modules/
+vendor/
+docker-compose*.yml.bak
+*.bak
+*.log
+*.sql
+*.sql.gz

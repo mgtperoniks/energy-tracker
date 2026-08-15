@@ -56,6 +56,21 @@ services:
     networks:
       - energy-network
 
+  environmental-poller:
+    build:
+      context: .
+      dockerfile: environmental-poller.Dockerfile
+    container_name: environmental-poller
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Asia/Jakarta
+      - DB_HOST=db
+    depends_on:
+      - db
+    networks:
+      - energy-network
+
 networks:
   energy-network:
     driver: bridge

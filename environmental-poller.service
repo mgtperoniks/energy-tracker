@@ -1,16 +1,11 @@
-[Unit]
-Description=Environmental Telemetry Poller (SHT40)
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/srv/docker/apps/energy-tracker
-ExecStart=/usr/bin/python3 /srv/docker/apps/energy-tracker/environmental_poller.py
-Restart=always
-RestartSec=5
-StandardOutput=append:/var/log/environmental-poller.log
-StandardError=append:/var/log/environmental-poller.log
-
-[Install]
-WantedBy=multi-user.target
+# DEPRECATED / DECOMMISSIONED
+# ===========================
+# The environmental-poller is now run as a Docker container service
+# managed by Docker Compose under the container name: environmental-poller.
+#
+# DO NOT enable or run this systemd service on the host.
+#
+# To manage the new poller, use Docker Compose on the production host:
+#   docker compose up -d environmental-poller
+#   docker compose logs -f environmental-poller
+#   docker compose stop environmental-poller
