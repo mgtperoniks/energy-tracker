@@ -25,3 +25,7 @@ Homestead.yaml
 Thumbs.db
 *.sql
 *.sql.gz
+
+# Python
+__pycache__/
+*.pyc
