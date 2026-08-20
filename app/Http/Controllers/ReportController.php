@@ -27,6 +27,17 @@ class ReportController extends Controller
         
         $devices = Device::with('machine')->get();
         
+        $allowedMetrics = ['usage', 'peak', 'volt', 'pf', 'samples'];
+        $selectedMetrics = $request->query('metrics');
+
+        if (is_array($selectedMetrics)) {
+            $selectedMetrics = array_intersect($selectedMetrics, $allowedMetrics);
+        }
+
+        if (empty($selectedMetrics)) {
+            $selectedMetrics = $allowedMetrics;
+        }
+        
         $isFiltered = $request->has('start_date');
         $reports = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50);
 
@@ -44,6 +55,23 @@ class ReportController extends Controller
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['date_range' => 'Maksimal rentang laporan adalah 45 hari.']);
+            }
+
+            // Metric validation
+            if ($request->has('metrics')) {
+                $reqMetrics = $request->query('metrics');
+                if (!is_array($reqMetrics) || count($reqMetrics) === 0) {
+                    return redirect()->back()
+                        ->withInput()
+                        ->withErrors(['date_range' => 'Paling tidak satu metrik harus dipilih.']);
+                }
+                
+                $invalidMetrics = array_diff($reqMetrics, $allowedMetrics);
+                if (count($invalidMetrics) > 0) {
+                    return redirect()->back()
+                        ->withInput()
+                        ->withErrors(['date_range' => 'Pilihan metrik tidak valid.']);
+                }
             }
 
             $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
@@ -69,7 +97,7 @@ class ReportController extends Controller
             'daily'  => \App\Models\SchedulerRun::where('job_name', 'energy:aggregate-daily')->first(),
         ];
 
-        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate', 'schedulerHealth', 'isFiltered'));
+        return view('analytics.operational', compact('reports', 'devices', 'deviceId', 'startDate', 'endDate', 'schedulerHealth', 'isFiltered', 'selectedMetrics'));
     }
 
     public function exportOperational(Request $request)
@@ -99,6 +127,17 @@ class ReportController extends Controller
         $startDate = $request->query('start_date', now('Asia/Jakarta')->subDays(7)->toDateString());
         $endDate = $request->query('end_date', now('Asia/Jakarta')->toDateString());
 
+        $allowedMetrics = ['usage', 'peak', 'volt', 'pf', 'samples'];
+        $selectedMetrics = $request->query('metrics');
+
+        if (is_array($selectedMetrics)) {
+            $selectedMetrics = array_intersect($selectedMetrics, $allowedMetrics);
+        }
+
+        if (empty($selectedMetrics)) {
+            $selectedMetrics = $allowedMetrics;
+        }
+
         $query = $this->buildOperationalQuery($startDate, $endDate, $deviceId);
         
         // Safety limit for PDF to prevent memory 500 error
@@ -115,7 +154,7 @@ class ReportController extends Controller
             $deviceName = $device ? $device->name : 'All Devices';
         }
 
-        $pdf = Pdf::loadView('exports.operational_pdf', compact('reports', 'startDate', 'endDate', 'deviceName'))
+        $pdf = Pdf::loadView('exports.operational_pdf', compact('reports', 'startDate', 'endDate', 'deviceName', 'selectedMetrics'))
                   ->setPaper('a4', 'portrait');
 
         return $pdf->stream('energy_operational_report_' . now()->format('Ymd_Hi') . '.pdf');

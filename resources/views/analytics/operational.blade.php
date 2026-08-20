@@ -65,29 +65,72 @@
 
         <!-- FILTER AREA -->
         <div class="bg-surface-container-lowest p-6 rounded-lg shadow-sm border border-surface-container-low mb-8">
-            <form method="GET" action="{{ route('analytics.operational') }}" class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-1">
-                    <label class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Date Range</label>
-                    <div class="flex items-center gap-2">
-                        <input type="date" name="start_date" value="{{ $startDate }}" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
-                        <span class="text-outline-variant font-bold">to</span>
-                        <input type="date" name="end_date" value="{{ $endDate }}" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+            <form method="GET" action="{{ route('analytics.operational') }}" class="flex flex-col gap-6">
+                <!-- Filters Row -->
+                <div class="flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-1 w-full">
+                        <label class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Date Range</label>
+                        <div class="flex items-center gap-2">
+                            <input type="date" name="start_date" value="{{ $startDate }}" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+                            <span class="text-outline-variant font-bold">to</span>
+                            <input type="date" name="end_date" value="{{ $endDate }}" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+                        </div>
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Filter by Device</label>
+                        <select name="device_id" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+                            <option value="">All Devices</option>
+                            @foreach($devices as $device)
+                                <option value="{{ $device->id }}" {{ $deviceId == $device->id ? 'selected' : '' }}>
+                                    {{ $device->name }} {{ $device->machine ? '('.$device->machine->name.')' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full md:w-auto px-6 py-2 bg-primary text-on-primary font-bold rounded-md hover:bg-primary/90 transition-colors h-[38px] flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-sm">filter_alt</span> Apply Filter
+                    </button>
+                </div>
+
+                <!-- Metrics Presets & Checkboxes Row -->
+                <div class="border-t border-outline-variant/30 pt-4 flex flex-col gap-4">
+                    <div>
+                        <span class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Report Columns / Metrics</span>
+                    </div>
+                    <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                        <div class="w-full lg:w-64">
+                            <label class="block text-[9px] font-bold text-outline uppercase tracking-widest mb-1 opacity-70">Preset Selection</label>
+                            <select id="preset-selector" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
+                                <option value="custom">Custom Selection</option>
+                                <option value="energy_consumption">Energy Consumption</option>
+                                <option value="power_quality">Power Quality</option>
+                                <option value="full_operational">Full Operational</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 flex flex-wrap gap-x-6 gap-y-3 pt-4 lg:pt-0">
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-on-surface font-medium select-none">
+                                <input type="checkbox" name="metrics[]" value="usage" class="metric-checkbox rounded text-primary focus:ring-primary border-outline-variant w-4 h-4" {{ in_array('usage', $selectedMetrics) ? 'checked' : '' }}>
+                                <span>Usage (kWh)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-on-surface font-medium select-none">
+                                <input type="checkbox" name="metrics[]" value="peak" class="metric-checkbox rounded text-primary focus:ring-primary border-outline-variant w-4 h-4" {{ in_array('peak', $selectedMetrics) ? 'checked' : '' }}>
+                                <span>Peak Load (kW)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-on-surface font-medium select-none">
+                                <input type="checkbox" name="metrics[]" value="volt" class="metric-checkbox rounded text-primary focus:ring-primary border-outline-variant w-4 h-4" {{ in_array('volt', $selectedMetrics) ? 'checked' : '' }}>
+                                <span>Avg Volt (V)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-on-surface font-medium select-none">
+                                <input type="checkbox" name="metrics[]" value="pf" class="metric-checkbox rounded text-primary focus:ring-primary border-outline-variant w-4 h-4" {{ in_array('pf', $selectedMetrics) ? 'checked' : '' }}>
+                                <span>Avg PF</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-on-surface font-medium select-none">
+                                <input type="checkbox" name="metrics[]" value="samples" class="metric-checkbox rounded text-primary focus:ring-primary border-outline-variant w-4 h-4" {{ in_array('samples', $selectedMetrics) ? 'checked' : '' }}>
+                                <span>Samples</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-                <div class="flex-1">
-                    <label class="block text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Filter by Device</label>
-                    <select name="device_id" class="w-full bg-surface border border-outline-variant rounded-md text-sm p-2 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all">
-                        <option value="">All Devices</option>
-                        @foreach($devices as $device)
-                            <option value="{{ $device->id }}" {{ $deviceId == $device->id ? 'selected' : '' }}>
-                                {{ $device->name }} {{ $device->machine ? '('.$device->machine->name.')' : '' }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <button type="submit" class="px-6 py-2 bg-primary text-on-primary font-bold rounded-md hover:bg-primary/90 transition-colors h-[38px] flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-sm">filter_alt</span> Apply Filter
-                </button>
             </form>
         </div>
 
@@ -129,11 +172,21 @@
                             <tr class="bg-surface-container-low text-[10px] font-black text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/30">
                                 <th class="px-6 py-4">Date</th>
                                 <th class="px-6 py-4">Device (Machine)</th>
-                                <th class="px-6 py-4 text-right">Usage (kWh)</th>
-                                <th class="px-6 py-4 text-right">Peak Load (kW)</th>
-                                <th class="px-6 py-4 text-right">Avg Voltage (V)</th>
-                                <th class="px-6 py-4 text-right">Avg PF</th>
-                                <th class="px-6 py-4 text-right">Samples</th>
+                                @if(in_array('usage', $selectedMetrics))
+                                    <th class="px-6 py-4 text-right">Usage (kWh)</th>
+                                @endif
+                                @if(in_array('peak', $selectedMetrics))
+                                    <th class="px-6 py-4 text-right">Peak Load (kW)</th>
+                                @endif
+                                @if(in_array('volt', $selectedMetrics))
+                                    <th class="px-6 py-4 text-right">Avg Voltage (V)</th>
+                                @endif
+                                @if(in_array('pf', $selectedMetrics))
+                                    <th class="px-6 py-4 text-right">Avg PF</th>
+                                @endif
+                                @if(in_array('samples', $selectedMetrics))
+                                    <th class="px-6 py-4 text-right">Samples</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-surface-container-low">
@@ -155,15 +208,25 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-black text-primary">{{ number_format($row->kwh_usage, 2) }}</td>
-                                    <td class="px-6 py-4 text-right font-medium text-error">{{ number_format($row->max_power_kw, 2) }}</td>
-                                    <td class="px-6 py-4 text-right font-medium text-on-surface-variant">{{ number_format($row->avg_voltage, 1) }}</td>
-                                    <td class="px-6 py-4 text-right font-medium text-tertiary">{{ number_format($row->avg_power_factor, 2) }}</td>
-                                    <td class="px-6 py-4 text-right font-mono text-xs text-outline">{{ number_format($row->total_sample_count) }}</td>
+                                    @if(in_array('usage', $selectedMetrics))
+                                        <td class="px-6 py-4 text-right font-black text-primary">{{ number_format($row->kwh_usage, 2) }}</td>
+                                    @endif
+                                    @if(in_array('peak', $selectedMetrics))
+                                        <td class="px-6 py-4 text-right font-medium text-error">{{ number_format($row->max_power_kw, 2) }}</td>
+                                    @endif
+                                    @if(in_array('volt', $selectedMetrics))
+                                        <td class="px-6 py-4 text-right font-medium text-on-surface-variant">{{ number_format($row->avg_voltage, 1) }}</td>
+                                    @endif
+                                    @if(in_array('pf', $selectedMetrics))
+                                        <td class="px-6 py-4 text-right font-medium text-tertiary">{{ number_format($row->avg_power_factor, 2) }}</td>
+                                    @endif
+                                    @if(in_array('samples', $selectedMetrics))
+                                        <td class="px-6 py-4 text-right font-mono text-xs text-outline">{{ number_format($row->total_sample_count) }}</td>
+                                    @endif
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-10 text-center text-outline italic">No data found for this range.</td>
+                                    <td colspan="{{ 2 + count($selectedMetrics) }}" class="px-6 py-10 text-center text-outline italic">No data found for this range.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -182,6 +245,61 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.querySelector('form');
+        const presetSelector = document.getElementById('preset-selector');
+        const checkboxes = document.querySelectorAll('.metric-checkbox');
+        
+        const presets = {
+            energy_consumption: { usage: true, peak: false, volt: false, pf: false, samples: false },
+            power_quality: { usage: false, peak: true, volt: true, pf: true, samples: false },
+            full_operational: { usage: true, peak: true, volt: true, pf: true, samples: true }
+        };
+
+        function updatePresetDropdown() {
+            let currentValues = {};
+            checkboxes.forEach(cb => {
+                currentValues[cb.value] = cb.checked;
+            });
+
+            let matchedPreset = 'custom';
+            for (const [presetName, presetValues] of Object.entries(presets)) {
+                let match = true;
+                for (const [metric, checked] of Object.entries(presetValues)) {
+                    if (currentValues[metric] !== checked) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    matchedPreset = presetName;
+                    break;
+                }
+            }
+            presetSelector.value = matchedPreset;
+        }
+
+        presetSelector.addEventListener('change', function () {
+            const val = this.value;
+            if (val !== 'custom' && presets[val]) {
+                checkboxes.forEach(cb => {
+                    cb.checked = presets[val][cb.value];
+                });
+            }
+        });
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function () {
+                const checkedCount = Array.from(checkboxes).filter(c => c.checked).length;
+                if (checkedCount === 0) {
+                    this.checked = true;
+                    alert('Paling tidak satu metrik/kolom harus dipilih.');
+                    return;
+                }
+                updatePresetDropdown();
+            });
+        });
+
+        updatePresetDropdown();
+
         if (form) {
             form.addEventListener('submit', function (e) {
                 const startDateVal = document.querySelector('input[name="start_date"]').value;
@@ -203,7 +321,15 @@
                     if (diffDays > 45) {
                         e.preventDefault();
                         alert('Maksimal rentang laporan adalah 45 hari. Silakan pilih rentang tanggal yang lebih pendek.');
+                        return;
                     }
+                }
+
+                const checkedCount = Array.from(checkboxes).filter(c => c.checked).length;
+                if (checkedCount === 0) {
+                    e.preventDefault();
+                    alert('Paling tidak satu metrik/kolom harus dipilih.');
+                    return;
                 }
             });
         }
